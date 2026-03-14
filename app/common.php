@@ -1,5 +1,6 @@
 <?php
 // 应用公共文件
+use Firebase\JWT\JWT;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Iodev\Whois\Factory;
@@ -618,4 +619,55 @@ function checkTableExists($table)
     $prefix = env('database.prefix', 'dnsmgr_');
     $res = Db::query("SHOW TABLES LIKE '" . $prefix . $table . "'");
     return !empty($res);
+}
+
+/**
+ * Generate JWT access token
+ *
+ * @param int $uid User ID
+ * @param string $type User type ('user' or 'account')
+ * @return string JWT token
+ */
+function generateJwtToken($uid, $type)
+{
+    $secret = env('jwt.jwt_secret', '');
+    $issuer = env('jwt.jwt_issuer', 'dnsmgr');
+    $ttl = env('jwt.jwt_ttl', 7200);
+    $algo = 'HS256';
+
+    $payload = [
+        'iss' => $issuer,
+        'iat' => time(),
+        'exp' => time() + $ttl,
+        'uid' => $uid,
+        'type' => $type,
+    ];
+
+    return \Firebase\JWT\JWT::encode($payload, $secret, $algo);
+}
+
+/**
+ * Generate JWT refresh token
+ *
+ * @param int $uid User ID
+ * @param string $type User type ('user' or 'account')
+ * @return string JWT refresh token
+ */
+function generateRefreshToken($uid, $type)
+{
+    $secret = env('jwt.jwt_secret', '');
+    $issuer = env('jwt.jwt_issuer', 'dnsmgr');
+    $refreshTtl = env('jwt.jwt_refresh_ttl', 604800);
+    $algo = 'HS256';
+
+    $payload = [
+        'iss' => $issuer,
+        'iat' => time(),
+        'exp' => time() + $refreshTtl,
+        'uid' => $uid,
+        'type' => $type,
+        'refresh' => true,
+    ];
+
+    return \Firebase\JWT\JWT::encode($payload, $secret, $algo);
 }

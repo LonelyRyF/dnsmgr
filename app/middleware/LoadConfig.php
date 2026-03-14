@@ -24,42 +24,47 @@ class LoadConfig
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!file_exists(app()->getRootPath() . '.env')) {
-            if (!str_contains($request->url(), '/install')) {
-                return redirect((string)url('/install'))->header([
-                    'Cache-Control' => 'no-store, no-cache, must-revalidate',
-                    'Pragma' => 'no-cache',
-                ]);
-            } else {
-                return $next($request);
+        // Skip database checks for API routes
+        $isApiRoute = str_starts_with($request->pathinfo(), 'api/');
+
+        if (!$isApiRoute) {
+            if (!file_exists(app()->getRootPath() . '.env')) {
+                if (!str_contains($request->url(), '/install')) {
+                    return redirect((string)url('/install'))->header([
+                        'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                        'Pragma' => 'no-cache',
+                    ]);
+                } else {
+                    return $next($request);
+                }
             }
-        }
-        if (!checkTableExists('config') && !checkTableExists('user')) {
-            if (!str_contains($request->url(), '/install')) {
-                return redirect((string)url('/install'))->header([
-                    'Cache-Control' => 'no-store, no-cache, must-revalidate',
-                    'Pragma' => 'no-cache',
-                ]);
-            } else {
-                return $next($request);
+            if (!checkTableExists('config') && !checkTableExists('user')) {
+                if (!str_contains($request->url(), '/install')) {
+                    return redirect((string)url('/install'))->header([
+                        'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                        'Pragma' => 'no-cache',
+                    ]);
+                } else {
+                    return $next($request);
+                }
+            }
+
+            try {
+                $res = Db::name('config')->cache('configs', 0)->column('value', 'key');
+                if (empty($res['sys_key']) && !empty(env('app.sys_key'))) {
+                    config_set('sys_key', env('app.sys_key'));
+                    Cache::delete('configs');
+                    $res['sys_key'] = env('app.sys_key');
+                }
+                Config::set($res, 'sys');
+            } catch (Exception $e) {
+                if (!strpos($e->getMessage(), 'doesn\'t exist')) {
+                    throw $e;
+                }
             }
         }
 
-        try {
-            $res = Db::name('config')->cache('configs', 0)->column('value', 'key');
-            if (empty($res['sys_key']) && !empty(env('app.sys_key'))) {
-                config_set('sys_key', env('app.sys_key'));
-                Cache::delete('configs');
-                $res['sys_key'] = env('app.sys_key');
-            }
-            Config::set($res, 'sys');
-        } catch (Exception $e) {
-            if (!strpos($e->getMessage(), 'doesn\'t exist')) {
-                throw $e;
-            }
-        }
-
-        $request->isApi = false;
+        $request->isApi = $isApiRoute;
 
         return $next($request)->header([
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
