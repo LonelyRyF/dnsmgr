@@ -4,9 +4,9 @@ namespace app\controller;
 
 use app\BaseController;
 use Exception;
+use think\facade\Cache;
 use think\facade\Db;
 use think\facade\View;
-use think\facade\Cache;
 
 class Index extends BaseController
 {
@@ -87,14 +87,14 @@ class Index extends BaseController
         }
         config_set('version', config('app.dbversion'));
         Cache::clear();
-        if(Db::name('account')->count() > 0 && Db::name('account')->whereNotNull('config')->count() == 0) {
+        if (Db::name('account')->count() > 0 && Db::name('account')->whereNotNull('config')->count() == 0) {
             $accounts = Db::name('account')->select();
             foreach ($accounts as $account) {
                 if (!empty($account['config']) || !isset(\app\lib\DnsHelper::$dns_config[$account['type']])) continue;
                 $config = [];
                 $account_fields = ['name', 'sk', 'ext'];
                 $i = 0;
-                foreach(\app\lib\DnsHelper::$dns_config[$account['type']]['config'] as $field => $item) {
+                foreach (\app\lib\DnsHelper::$dns_config[$account['type']]['config'] as $field => $item) {
                     if ($field == 'proxy') {
                         $config[$field] = $account['proxy'];
                         break;
@@ -127,8 +127,8 @@ class Index extends BaseController
     {
         if (!checkPermission(1)) return $this->alert('error', '无权限');
         Cache::clear();
-        clearDirectory(app()->getRuntimePath().'cache/');
-        clearDirectory(app()->getRuntimePath().'temp/');
+        clearDirectory(app()->getRuntimePath() . 'cache/');
+        clearDirectory(app()->getRuntimePath() . 'temp/');
         return json(['code' => 0, 'msg' => 'succ']);
     }
 

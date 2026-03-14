@@ -25,6 +25,24 @@ class safeline implements DeployInterface
         $this->request('/api/open/system');
     }
 
+    private function request($path, $params = null)
+    {
+        $url = $this->url . $path;
+        $headers = ['X-SLCE-API-TOKEN' => $this->token];
+        $body = null;
+        if ($params) {
+            $headers['Content-Type'] = 'application/json';
+            $body = json_encode($params);
+        }
+        $response = http_request($url, $body, null, null, $headers, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if ($response['code'] == 200 && $result) {
+            return $result['data'] ?? null;
+        } else {
+            throw new Exception(!empty($result['msg']) ? $result['msg'] : '请求失败(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $domains = $config['domainList'];
@@ -80,33 +98,15 @@ class safeline implements DeployInterface
         }
     }
 
-    private function request($path, $params = null)
+    private function log($txt)
     {
-        $url = $this->url . $path;
-        $headers = ['X-SLCE-API-TOKEN' => $this->token];
-        $body = null;
-        if ($params) {
-            $headers['Content-Type'] = 'application/json';
-            $body = json_encode($params);
-        }
-        $response = http_request($url, $body, null, null, $headers, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if ($response['code'] == 200 && $result) {
-            return $result['data'] ?? null;
-        } else {
-            throw new Exception(!empty($result['msg']) ? $result['msg'] : '请求失败(httpCode=' . $response['code'] . ')');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

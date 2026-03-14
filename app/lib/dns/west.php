@@ -58,6 +58,51 @@ class west implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function execute($path, $params)
+    {
+        $params['username'] = $this->username;
+        $params['time'] = getMillisecond();
+        $params['token'] = md5($this->username . $this->api_password . $params['time']);
+        try {
+            $response = http_request($this->baseUrl . $path, http_build_query($params), null, null, null, $this->proxy);
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        $response = mb_convert_encoding($response['body'], 'UTF-8', 'GBK');
+        $arr = json_decode($response, true);
+        if ($arr) {
+            if ($arr['result'] == 200) {
+                return isset($arr['data']) ? $arr['data'] : [];
+            } else {
+                $this->setError($arr['msg']);
+                return false;
+            }
+        } else {
+            $this->setError('返回数据解析失败');
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['act' => 'getdnsrecord', 'domain' => $this->domain, 'type' => $Type, 'line' => $Line, 'host' => $KeyWord, 'value' => $Value, 'pageno' => $PageNumber, 'limit' => $PageSize];
@@ -88,20 +133,15 @@ class west implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['act' => 'adddnsrecord', 'domain' => $this->domain, 'host' => $Name, 'type' => $this->convertType($Type), 'value' => $Value, 'level' => $MX, 'ttl' => intval($TTL), 'line' => $Line];
@@ -109,7 +149,15 @@ class west implements DnsInterface
         return is_array($data) ? $data['id'] : false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
+    private function convertType($type)
+    {
+        return $type;
+    }
+
+    //设置解析记录状态
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['act' => 'moddnsrecord', 'domain' => $this->domain, 'id' => $RecordId, 'type' => $this->convertType($Type), 'value' => $Value, 'level' => $MX, 'ttl' => intval($TTL), 'line' => $Line];
@@ -117,13 +165,15 @@ class west implements DnsInterface
         return is_array($data);
     }
 
-    //修改解析记录备注
+    //获取解析记录操作日志
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析线路列表
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['act' => 'deldnsrecord', 'domain' => $this->domain, 'id' => $RecordId];
@@ -131,7 +181,8 @@ class west implements DnsInterface
         return is_array($data);
     }
 
-    //设置解析记录状态
+    //获取域名信息
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $param = ['act' => 'pause', 'domain' => $this->domain, 'id' => $RecordId, 'val' => $Status == '1' ? '0' : '1'];
@@ -139,13 +190,13 @@ class west implements DnsInterface
         return $data !== false;
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         return [
@@ -159,13 +210,11 @@ class west implements DnsInterface
         ];
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -174,42 +223,5 @@ class west implements DnsInterface
     public function addDomain($Domain)
     {
         return false;
-    }
-
-    private function convertType($type)
-    {
-        return $type;
-    }
-
-    private function execute($path, $params)
-    {
-        $params['username'] = $this->username;
-        $params['time'] = getMillisecond();
-        $params['token'] = md5($this->username.$this->api_password.$params['time']);
-        try{
-            $response = http_request($this->baseUrl . $path, http_build_query($params), null, null, null, $this->proxy);
-        }catch(\Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-        $response = mb_convert_encoding($response['body'], 'UTF-8', 'GBK');
-        $arr = json_decode($response, true);
-        if ($arr) {
-            if ($arr['result'] == 200) {
-                return isset($arr['data']) ? $arr['data'] : [];
-            } else {
-                $this->setError($arr['msg']);
-                return false;
-            }
-        } else {
-            $this->setError('返回数据解析失败');
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

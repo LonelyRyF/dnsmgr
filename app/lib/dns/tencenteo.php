@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\TencentCloud;
+use app\lib\DnsInterface;
 use Exception;
 
 class tencenteo implements DnsInterface
@@ -71,6 +71,35 @@ class tencenteo implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_request($action, $param)
+    {
+        try {
+            return $this->client->request($action, $param);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $offset = ($PageNumber - 1) * $PageSize;
@@ -94,7 +123,7 @@ class tencenteo implements DnsInterface
         if ($data) {
             $list = [];
             foreach ($data['DnsRecords'] as $row) {
-                $name = substr($row['Name'], 0, - (strlen($this->domain) + 1));
+                $name = substr($row['Name'], 0, -(strlen($this->domain) + 1));
                 if ($name == '') $name = '@';
                 $list[] = [
                     'RecordId' => $row['RecordId'],
@@ -116,14 +145,8 @@ class tencenteo implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         $action = 'DescribeDnsRecords';
@@ -131,7 +154,7 @@ class tencenteo implements DnsInterface
         $data = $this->send_request($action, $param);
         if ($data) {
             $row = $data['DnsRecords'][0];
-            $name = substr($row['Name'], 0, - (strlen($this->domain) + 1));
+            $name = substr($row['Name'], 0, -(strlen($this->domain) + 1));
             if ($name == '') $name = '@';
             return [
                 'RecordId' => $row['RecordId'],
@@ -151,7 +174,8 @@ class tencenteo implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $action = 'CreateDnsRecord';
@@ -166,7 +190,8 @@ class tencenteo implements DnsInterface
         return is_array($data) ? $data['RecordId'] : false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $action = 'ModifyDnsRecord';
@@ -181,13 +206,15 @@ class tencenteo implements DnsInterface
         return is_array($data);
     }
 
-    //修改解析记录备注
+    //设置解析记录状态
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析记录操作日志
+
     public function deleteDomainRecord($RecordId)
     {
         $action = 'DeleteDnsRecords';
@@ -196,7 +223,8 @@ class tencenteo implements DnsInterface
         return is_array($data);
     }
 
-    //设置解析记录状态
+    //获取解析线路列表
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $action = 'ModifyDnsRecordsStatus';
@@ -207,25 +235,25 @@ class tencenteo implements DnsInterface
         return is_array($data);
     }
 
-    //获取解析记录操作日志
+    //获取域名概览信息
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
+    //获取域名最低TTL
+
     public function getRecordLine()
     {
         return ['Default' => ['name' => '默认', 'parent' => null]];
     }
 
-    //获取域名概览信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return 60;
@@ -234,21 +262,5 @@ class tencenteo implements DnsInterface
     public function addDomain($Domain)
     {
         return false;
-    }
-
-    private function send_request($action, $param)
-    {
-        try{
-            return $this->client->request($action, $param);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

@@ -5,12 +5,12 @@ namespace app\controller;
 use app\BaseController;
 use app\lib\CertHelper;
 use app\lib\DeployHelper;
-use app\service\CertOrderService;
 use app\service\CertDeployService;
+use app\service\CertOrderService;
 use Exception;
+use think\facade\Cache;
 use think\facade\Db;
 use think\facade\View;
-use think\facade\Cache;
 
 class Cert extends BaseController
 {
@@ -137,32 +137,6 @@ class Cert extends BaseController
         return json(['code' => -3]);
     }
 
-    public function account_form()
-    {
-        if (!checkPermission(2)) return $this->alert('error', '无权限');
-        $action = input('param.action');
-        $deploy = input('get.deploy/d', 0);
-        $title = $deploy == 1 ? '自动部署账户' : 'SSL证书账户';
-
-        $account = null;
-        if ($action == 'edit') {
-            $id = input('get.id/d');
-            $account = Db::name('cert_account')->where('id', $id)->find();
-            if (empty($account)) return $this->alert('error', $title . '不存在');
-        }
-
-        $typeList = $deploy == 1 ? DeployHelper::getList() : CertHelper::getList();
-        $classList = $deploy == 1 ? DeployHelper::$class_config : CertHelper::$class_config;
-
-        View::assign('title', $title);
-        View::assign('info', $account);
-        View::assign('typeList', $typeList);
-        View::assign('classList', $classList);
-        View::assign('action', $action);
-        View::assign('deploy', $deploy);
-        return View::fetch();
-    }
-
     private function checkAccount($id, $type, $deploy)
     {
         if ($deploy == 0) {
@@ -193,6 +167,32 @@ class Cert extends BaseController
                 throw new Exception('SSL证书申请模块' . $type . '不存在');
             }
         }
+    }
+
+    public function account_form()
+    {
+        if (!checkPermission(2)) return $this->alert('error', '无权限');
+        $action = input('param.action');
+        $deploy = input('get.deploy/d', 0);
+        $title = $deploy == 1 ? '自动部署账户' : 'SSL证书账户';
+
+        $account = null;
+        if ($action == 'edit') {
+            $id = input('get.id/d');
+            $account = Db::name('cert_account')->where('id', $id)->find();
+            if (empty($account)) return $this->alert('error', $title . '不存在');
+        }
+
+        $typeList = $deploy == 1 ? DeployHelper::getList() : CertHelper::getList();
+        $classList = $deploy == 1 ? DeployHelper::$class_config : CertHelper::$class_config;
+
+        View::assign('title', $title);
+        View::assign('info', $account);
+        View::assign('typeList', $typeList);
+        View::assign('classList', $classList);
+        View::assign('action', $action);
+        View::assign('deploy', $deploy);
+        return View::fetch();
     }
 
     public function certorder()
@@ -487,36 +487,6 @@ class Cert extends BaseController
         return json(['code' => -3]);
     }
 
-    private function check_order($order, $domains)
-    {
-        $account = Db::name('cert_account')->where('id', $order['aid'])->find();
-        if (!$account) return ['code' => -1, 'msg' => 'SSL证书账户不存在'];
-        $max_domains = CertHelper::$cert_config[$account['type']]['max_domains'];
-        $wildcard = CertHelper::$cert_config[$account['type']]['wildcard'];
-        $cname = CertHelper::$cert_config[$account['type']]['cname'];
-        if (count($domains) > $max_domains) {
-            if (!(count($domains) == 2 && $max_domains == 1 && ltrim($domains[0], 'www.') == ltrim($domains[1], 'www.'))) {
-                return ['code' => -1, 'msg' => '域名数量不能超过' . $max_domains . '个'];
-            }
-        }
-
-        foreach ($domains as $domain) {
-            if (!$wildcard && strpos($domain, '*') !== false) return ['code' => -1, 'msg' => '该证书账户类型不支持泛域名'];
-            $mainDomain = getMainDomain($domain);
-            $drow = Db::name('domain')->where('name', $mainDomain)->find();
-            if (!$drow) {
-                $drow = Db::name('domain_alias')->alias('A')->join('domain B', 'A.did = B.id')->where('A.name', $mainDomain)->find();
-                if (!$drow) {
-                    if (substr($domain, 0, 2) == '*.') $domain = substr($domain, 2);
-                    if (!$cname || !Db::name('cert_cname')->where('domain', $domain)->where('status', 1)->find()) {
-                        return ['code' => -1, 'msg' => '域名' . $domain . '未在本系统添加'];
-                    }
-                }
-            }
-        }
-        return true;
-    }
-
     private function parse_cert_key($fullchain, $privatekey)
     {
         if (!openssl_x509_read($fullchain)) return ['code' => -1, 'msg' => '证书内容填写错误'];
@@ -570,6 +540,36 @@ class Cert extends BaseController
             'issuer' => $issuer,
             'domains' => $domains,
         ];
+    }
+
+    private function check_order($order, $domains)
+    {
+        $account = Db::name('cert_account')->where('id', $order['aid'])->find();
+        if (!$account) return ['code' => -1, 'msg' => 'SSL证书账户不存在'];
+        $max_domains = CertHelper::$cert_config[$account['type']]['max_domains'];
+        $wildcard = CertHelper::$cert_config[$account['type']]['wildcard'];
+        $cname = CertHelper::$cert_config[$account['type']]['cname'];
+        if (count($domains) > $max_domains) {
+            if (!(count($domains) == 2 && $max_domains == 1 && ltrim($domains[0], 'www.') == ltrim($domains[1], 'www.'))) {
+                return ['code' => -1, 'msg' => '域名数量不能超过' . $max_domains . '个'];
+            }
+        }
+
+        foreach ($domains as $domain) {
+            if (!$wildcard && strpos($domain, '*') !== false) return ['code' => -1, 'msg' => '该证书账户类型不支持泛域名'];
+            $mainDomain = getMainDomain($domain);
+            $drow = Db::name('domain')->where('name', $mainDomain)->find();
+            if (!$drow) {
+                $drow = Db::name('domain_alias')->alias('A')->join('domain B', 'A.did = B.id')->where('A.name', $mainDomain)->find();
+                if (!$drow) {
+                    if (substr($domain, 0, 2) == '*.') $domain = substr($domain, 2);
+                    if (!$cname || !Db::name('cert_cname')->where('domain', $domain)->where('status', 1)->find()) {
+                        return ['code' => -1, 'msg' => '域名' . $domain . '未在本系统添加'];
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     public function order_process()

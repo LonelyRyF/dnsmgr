@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Qiniu as QiniuClient;
+use app\lib\DeployInterface;
 use Exception;
 
 class qiniu implements DeployInterface
@@ -55,53 +55,6 @@ class qiniu implements DeployInterface
         }
     }
 
-    private function deploy_cdn($domain, $cert_id)
-    {
-        try {
-            $data = $this->client->request('GET', '/domain/' . $domain);
-        } catch (Exception $e) {
-            throw new Exception('获取域名信息失败:' . $e->getMessage());
-        }
-        if (isset($data['https']['certId']) && $data['https']['certId'] == $cert_id) {
-            $this->log('域名 ' . $domain . ' 证书已部署，无需重复操作');
-            return;
-        }
-
-        if (empty($data['https']['certId'])) {
-            $param = [
-                'certid' => $cert_id,
-            ];
-            $this->client->request('PUT', '/domain/' . $domain . '/sslize', null, $param);
-        } else {
-            $param = [
-                'certid' => $cert_id,
-                'forceHttps' => $data['https']['forceHttps'],
-                'http2Enable' => $data['https']['http2Enable'],
-            ];
-            $this->client->request('PUT', '/domain/' . $domain . '/httpsconf', null, $param);
-        }
-        $this->log('CDN域名 ' . $domain . ' 证书部署成功！');
-    }
-
-    private function deploy_oss($domain, $cert_id)
-    {
-        $param = [
-            'certid' => $cert_id,
-            'domain' => $domain,
-        ];
-        $this->client->request('POST', '/cert/bind', null, $param);
-        $this->log('OSS域名 ' . $domain . ' 证书部署成功！');
-    }
-
-    private function deploy_pili($hub, $domain, $cert_name)
-    {
-        $param = [
-            'CertName' => $cert_name,
-        ];
-        $this->client->pili_request('POST', '/v2/hubs/'.$hub.'/domains/'.$domain.'/cert', null, $param);
-        $this->log('视频直播域名 ' . $domain . ' 证书部署成功！');
-    }
-
     private function get_cert_id($fullchain, $privatekey, $common_name, $cert_name)
     {
         $cert_id = null;
@@ -146,15 +99,62 @@ class qiniu implements DeployInterface
         return $cert_id;
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    private function deploy_cdn($domain, $cert_id)
+    {
+        try {
+            $data = $this->client->request('GET', '/domain/' . $domain);
+        } catch (Exception $e) {
+            throw new Exception('获取域名信息失败:' . $e->getMessage());
+        }
+        if (isset($data['https']['certId']) && $data['https']['certId'] == $cert_id) {
+            $this->log('域名 ' . $domain . ' 证书已部署，无需重复操作');
+            return;
+        }
+
+        if (empty($data['https']['certId'])) {
+            $param = [
+                'certid' => $cert_id,
+            ];
+            $this->client->request('PUT', '/domain/' . $domain . '/sslize', null, $param);
+        } else {
+            $param = [
+                'certid' => $cert_id,
+                'forceHttps' => $data['https']['forceHttps'],
+                'http2Enable' => $data['https']['http2Enable'],
+            ];
+            $this->client->request('PUT', '/domain/' . $domain . '/httpsconf', null, $param);
+        }
+        $this->log('CDN域名 ' . $domain . ' 证书部署成功！');
+    }
+
+    private function deploy_oss($domain, $cert_id)
+    {
+        $param = [
+            'certid' => $cert_id,
+            'domain' => $domain,
+        ];
+        $this->client->request('POST', '/cert/bind', null, $param);
+        $this->log('OSS域名 ' . $domain . ' 证书部署成功！');
+    }
+
+    private function deploy_pili($hub, $domain, $cert_name)
+    {
+        $param = [
+            'CertName' => $cert_name,
+        ];
+        $this->client->pili_request('POST', '/v2/hubs/' . $hub . '/domains/' . $domain . '/cert', null, $param);
+        $this->log('视频直播域名 ' . $domain . ' 证书部署成功！');
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

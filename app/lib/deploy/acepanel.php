@@ -34,80 +34,6 @@ class acepanel implements DeployInterface
         }
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        if ($config['type'] == '1') {
-            $this->deployPanel($fullchain, $privatekey);
-            $this->log("面板证书部署成功");
-            return;
-        }
-        $sites = explode("\n", $config['sites']);
-        $success = 0;
-        $errmsg = null;
-        foreach ($sites as $site) {
-            $site = trim($site);
-            if (empty($site)) continue;
-            try {
-                $this->deploySite($site, $fullchain, $privatekey);
-                $this->log("网站 {$site} 证书部署成功");
-                $success++;
-            } catch (Exception $e) {
-                $errmsg = $e->getMessage();
-                $this->log("网站 {$site} 证书部署失败：" . $errmsg);
-            }
-        }
-        if ($success == 0) {
-            throw new Exception($errmsg ?: '要部署的网站不存在');
-        }
-    }
-
-    private function deployPanel($fullchain, $privatekey)
-    {
-        $data = [
-            'cert' => $fullchain,
-            'key' => $privatekey,
-        ];
-        $response = $this->request('/setting/cert', $data);
-        $result = json_decode($response, true);
-        if (isset($result['msg']) && $result['msg'] == "success") {
-            return true;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception($response ?: '返回数据解析失败');
-        }
-    }
-
-    private function deploySite($name, $fullchain, $privatekey)
-    {
-        $data = [
-            'name' => $name,
-            'cert' => $fullchain,
-            'key' => $privatekey,
-        ];
-        $response = $this->request('/website/cert', $data);
-        $result = json_decode($response, true);
-        if (isset($result['msg']) && $result['msg'] == "success") {
-            return true;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception($response ?: '返回数据解析失败');
-        }
-    }
-
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
     private function request($path, $params, $method = 'POST')
     {
         $url = $this->url . '/api' . $path;
@@ -159,5 +85,79 @@ class acepanel implements DeployInterface
             'signature' => $signature,
             'id' => $id
         ];
+    }
+
+    public function deploy($fullchain, $privatekey, $config, &$info)
+    {
+        if ($config['type'] == '1') {
+            $this->deployPanel($fullchain, $privatekey);
+            $this->log("面板证书部署成功");
+            return;
+        }
+        $sites = explode("\n", $config['sites']);
+        $success = 0;
+        $errmsg = null;
+        foreach ($sites as $site) {
+            $site = trim($site);
+            if (empty($site)) continue;
+            try {
+                $this->deploySite($site, $fullchain, $privatekey);
+                $this->log("网站 {$site} 证书部署成功");
+                $success++;
+            } catch (Exception $e) {
+                $errmsg = $e->getMessage();
+                $this->log("网站 {$site} 证书部署失败：" . $errmsg);
+            }
+        }
+        if ($success == 0) {
+            throw new Exception($errmsg ?: '要部署的网站不存在');
+        }
+    }
+
+    private function deployPanel($fullchain, $privatekey)
+    {
+        $data = [
+            'cert' => $fullchain,
+            'key' => $privatekey,
+        ];
+        $response = $this->request('/setting/cert', $data);
+        $result = json_decode($response, true);
+        if (isset($result['msg']) && $result['msg'] == "success") {
+            return true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception($response ?: '返回数据解析失败');
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    private function deploySite($name, $fullchain, $privatekey)
+    {
+        $data = [
+            'name' => $name,
+            'cert' => $fullchain,
+            'key' => $privatekey,
+        ];
+        $response = $this->request('/website/cert', $data);
+        $result = json_decode($response, true);
+        if (isset($result['msg']) && $result['msg'] == "success") {
+            return true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception($response ?: '返回数据解析失败');
+        }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

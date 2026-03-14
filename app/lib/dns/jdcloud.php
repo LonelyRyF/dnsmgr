@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\Jdcloud as JdcloudClient;
+use app\lib\DnsInterface;
 use Exception;
 
 class jdcloud implements DnsInterface
@@ -66,6 +66,35 @@ class jdcloud implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_request($method, $action, $params = [])
+    {
+        $path = '/' . $this->version . '/regions/' . $this->region . $action;
+        try {
+            return $this->client->request($method, $path, $params);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         if ($PageSize > 99) $PageSize = 99;
@@ -76,12 +105,12 @@ class jdcloud implements DnsInterface
         } elseif (!isNullOrEmpty($KeyWord)) {
             $query += ['search' => $KeyWord];
         }
-        $data = $this->send_request('GET', '/domain/'.$this->domainid.'/ResourceRecord', $query);
+        $data = $this->send_request('GET', '/domain/' . $this->domainid . '/ResourceRecord', $query);
         if ($data) {
             $list = [];
             foreach ($data['dataList'] as $row) {
                 if ($row['type'] == 'SRV') {
-                    $row['hostValue'] = $row['mxPriority'].' '.$row['weight'].' '.$row['port'].' '.$row['hostValue'];
+                    $row['hostValue'] = $row['mxPriority'] . ' ' . $row['weight'] . ' ' . $row['port'] . ' ' . $row['hostValue'];
                 }
                 $list[] = [
                     'RecordId' => $row['id'],
@@ -108,19 +137,15 @@ class jdcloud implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $params = ['hostRecord' => $Name, 'type' => $this->convertType($Type), 'hostValue' => $Value, 'viewValue' => intval($Line), 'ttl' => intval($TTL)];
@@ -133,14 +158,26 @@ class jdcloud implements DnsInterface
             $params['port'] = intval($values[2]);
             $params['hostValue'] = $values[3];
         }
-        $data = $this->send_request('POST', '/domain/'.$this->domainid.'/ResourceRecord', ['req'=>$params]);
+        $data = $this->send_request('POST', '/domain/' . $this->domainid . '/ResourceRecord', ['req' => $params]);
         return is_array($data) ? $data['dataList']['id'] : false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
+    private function convertType($type)
+    {
+        $convert_dict = ['REDIRECT_URL' => 'EXPLICIT_URL', 'FORWARD_URL' => 'IMPLICIT_URL'];
+        if (array_key_exists($type, $convert_dict)) {
+            return $convert_dict[$type];
+        }
+        return $type;
+    }
+
+    //设置解析记录状态
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
-        $params = ['domainName'=>$this->domain, 'hostRecord' => $Name, 'type' => $this->convertType($Type), 'hostValue' => $Value, 'viewValue' => intval($Line), 'ttl' => intval($TTL)];
+        $params = ['domainName' => $this->domain, 'hostRecord' => $Name, 'type' => $this->convertType($Type), 'hostValue' => $Value, 'viewValue' => intval($Line), 'ttl' => intval($TTL)];
         if ($Type == 'MX') $params['mxPriority'] = intval($MX);
         if (!isNullOrEmpty($Weight)) $params['weight'] = intval($Weight);
         if ($Type == 'SRV') {
@@ -150,42 +187,45 @@ class jdcloud implements DnsInterface
             $params['port'] = intval($values[2]);
             $params['hostValue'] = $values[3];
         }
-        return $this->send_request('PUT', '/domain/'.$this->domainid.'/ResourceRecord/'.$RecordId, ['req'=>$params]);
+        return $this->send_request('PUT', '/domain/' . $this->domainid . '/ResourceRecord/' . $RecordId, ['req' => $params]);
     }
 
-    //修改解析记录备注
+    //获取解析记录操作日志
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析线路列表
+
     public function deleteDomainRecord($RecordId)
     {
-        return $this->send_request('DELETE', '/domain/'.$this->domainid.'/ResourceRecord/'.$RecordId);
+        return $this->send_request('DELETE', '/domain/' . $this->domainid . '/ResourceRecord/' . $RecordId);
     }
 
-    //设置解析记录状态
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $params = ['action' => $Status == '1' ? 'enable' : 'disable'];
-        $data = $this->send_request('PUT', '/domain/'.$this->domainid.'/ResourceRecord/'.$RecordId.'/status', $params);
+        $data = $this->send_request('PUT', '/domain/' . $this->domainid . '/ResourceRecord/' . $RecordId . '/status', $params);
         return is_array($data);
     }
 
-    //获取解析记录操作日志
+    //获取域名概览信息
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
+    //获取域名最低TTL
+
     public function getRecordLine()
     {
         $domainInfo = $this->getDomainInfo();
         if (!$domainInfo) return false;
         $packId = $domainInfo['packId'];
-        $data = $this->send_request('GET', '/domain/'.$this->domainid.'/viewTree', ['packId'=>$packId, 'viewId'=>'0']);
+        $data = $this->send_request('GET', '/domain/' . $this->domainid . '/viewTree', ['packId' => $packId, 'viewId' => '0']);
         if ($data) {
             $list = [];
             $this->processLineList($list, $data['data'], null);
@@ -193,7 +233,18 @@ class jdcloud implements DnsInterface
         }
         return false;
     }
-    
+
+    public function getDomainInfo()
+    {
+        if (!empty($this->domainInfo)) return $this->domainInfo;
+        $query = ['domainId' => intval($this->domainid)];
+        $data = $this->send_request('GET', '/domain', $query);
+        if ($data && $data['dataList']) {
+            return $data['dataList'][0];
+        }
+        return false;
+    }
+
     private function processLineList(&$list, $line_list, $parent)
     {
         foreach ($line_list as $row) {
@@ -207,19 +258,6 @@ class jdcloud implements DnsInterface
         }
     }
 
-    //获取域名概览信息
-    public function getDomainInfo()
-    {
-        if (!empty($this->domainInfo)) return $this->domainInfo;
-        $query = ['domainId' => intval($this->domainid)];
-        $data = $this->send_request('GET', '/domain', $query);
-        if ($data && $data['dataList']) {
-            return $data['dataList'][0];
-        }
-        return false;
-    }
-
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -233,31 +271,5 @@ class jdcloud implements DnsInterface
             return ['id' => $data['data']['id'], 'name' => $data['data']['domainName']];
         }
         return false;
-    }
-
-    private function convertType($type)
-    {
-        $convert_dict = ['REDIRECT_URL' => 'EXPLICIT_URL', 'FORWARD_URL' => 'IMPLICIT_URL'];
-        if (array_key_exists($type, $convert_dict)) {
-            return $convert_dict[$type];
-        }
-        return $type;
-    }
-
-    private function send_request($method, $action, $params = [])
-    {
-        $path = '/'.$this->version.'/regions/'.$this->region.$action;
-        try{
-            return $this->client->request($method, $path, $params);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

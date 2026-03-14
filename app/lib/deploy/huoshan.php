@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Volcengine;
+use app\lib\DeployInterface;
 use Exception;
 
 class huoshan implements DeployInterface
@@ -50,6 +50,85 @@ class huoshan implements DeployInterface
                 $this->deploy_alb($cert_id, $config);
             }
         }
+    }
+
+    private function deploy_live($fullchain, $privatekey, $config)
+    {
+        if (empty($config['domain'])) throw new Exception('绑定的域名不能为空');
+
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+
+        $client = new Volcengine($this->AccessKeyId, $this->SecretAccessKey, 'live.volcengineapi.com', 'live', '2023-01-01', 'cn-north-1', $this->proxy);
+        $param = [
+            'CertName' => $cert_name,
+            'Rsa' => [
+                'Pubkey' => $fullchain,
+                'Prikey' => $privatekey,
+            ],
+            'UseWay' => 'https',
+        ];
+        $result = $client->request('POST', 'CreateCert', $param);
+        $this->log('上传证书成功 ChainID=' . $result['ChainID']);
+
+        foreach (explode(',', $config['domain']) as $domain) {
+            if (empty($domain)) continue;
+            $param = [
+                'ChainID' => $result['ChainID'],
+                'Domain' => $domain,
+                'HTTPS' => true,
+                'HTTP2' => true,
+            ];
+            $client->request('POST', 'BindCert', $param);
+            $this->log('视频直播域名 ' . $domain . ' 部署证书成功！');
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    private function get_cert_id($fullchain, $privatekey)
+    {
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+
+        $client = new Volcengine($this->AccessKeyId, $this->SecretAccessKey, 'certificate-service.volcengineapi.com', 'certificate_service', '2024-10-01', 'cn-beijing', $this->proxy);
+        $param = [
+            'Tag' => $cert_name,
+            'Repeatable' => false,
+            'CertificateInfo' => [
+                'CertificateChain' => $fullchain,
+                'PrivateKey' => $privatekey,
+            ],
+        ];
+        try {
+            $data = $client->request('POST', 'ImportCertificate', $param);
+        } catch (Exception $e) {
+            throw new Exception('上传证书失败：' . $e->getMessage());
+        }
+        if (!empty($data['InstanceId'])) {
+            $cert_id = $data['InstanceId'];
+            $this->log('上传证书成功 CertId=' . $cert_id);
+
+            $param = [
+                'InstanceId' => $cert_id,
+                'Options' => [
+                    'ExpiredNotice' => 'Disabled',
+                ],
+            ];
+            $client->request('POST', 'CertificateUpdateInstance', $param);
+
+        } else {
+            $cert_id = $data['RepeatId'];
+            $this->log('找到已上传的证书 CertId=' . $cert_id);
+        }
+        return $cert_id;
     }
 
     private function deploy_cdn($cert_id, $config)
@@ -99,39 +178,6 @@ class huoshan implements DeployInterface
             $query = ['customdomain' => ''];
             $client->tos_request('PUT', $param, $query);
             $this->log('对象存储域名 ' . $config['domain'] . ' 部署证书成功！');
-        }
-    }
-
-    private function deploy_live($fullchain, $privatekey, $config)
-    {
-        if (empty($config['domain'])) throw new Exception('绑定的域名不能为空');
-
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-
-        $client = new Volcengine($this->AccessKeyId, $this->SecretAccessKey, 'live.volcengineapi.com', 'live', '2023-01-01', 'cn-north-1', $this->proxy);
-        $param = [
-            'CertName' => $cert_name,
-            'Rsa' => [
-                'Pubkey' => $fullchain,
-                'Prikey' => $privatekey,
-            ],
-            'UseWay' => 'https',
-        ];
-        $result = $client->request('POST', 'CreateCert', $param);
-        $this->log('上传证书成功 ChainID=' . $result['ChainID']);
-
-        foreach (explode(',', $config['domain']) as $domain) {
-            if (empty($domain)) continue;
-            $param = [
-                'ChainID' => $result['ChainID'],
-                'Domain' => $domain,
-                'HTTPS' => true,
-                'HTTP2' => true,
-            ];
-            $client->request('POST', 'BindCert', $param);
-            $this->log('视频直播域名 ' . $domain . ' 部署证书成功！');
         }
     }
 
@@ -185,54 +231,8 @@ class huoshan implements DeployInterface
         $this->log('ALB监听器 ' . $config['listener_id'] . ' 部署证书成功！');
     }
 
-    private function get_cert_id($fullchain, $privatekey)
-    {
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-
-        $client = new Volcengine($this->AccessKeyId, $this->SecretAccessKey, 'certificate-service.volcengineapi.com', 'certificate_service', '2024-10-01', 'cn-beijing', $this->proxy);
-        $param = [
-            'Tag' => $cert_name,
-            'Repeatable' => false,
-            'CertificateInfo' => [
-                'CertificateChain' => $fullchain,
-                'PrivateKey' => $privatekey,
-            ],
-        ];
-        try {
-            $data = $client->request('POST', 'ImportCertificate', $param);
-        } catch (Exception $e) {
-            throw new Exception('上传证书失败：' . $e->getMessage());
-        }
-        if (!empty($data['InstanceId'])) {
-            $cert_id = $data['InstanceId'];
-            $this->log('上传证书成功 CertId=' . $cert_id);
-
-            $param = [
-                'InstanceId' => $cert_id,
-                'Options' => [
-                    'ExpiredNotice' => 'Disabled',
-                ],
-            ];
-            $client->request('POST', 'CertificateUpdateInstance', $param);
-
-        } else {
-            $cert_id = $data['RepeatId'];
-            $this->log('找到已上传的证书 CertId=' . $cert_id);
-        }
-        return $cert_id;
-    }
-
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

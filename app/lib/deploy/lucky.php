@@ -25,6 +25,29 @@ class lucky implements DeployInterface
         $this->request("/api/modules/list");
     }
 
+    private function request($path, $params = null, $method = null)
+    {
+        $url = $this->url . $path;
+
+        $headers = [
+            'openToken' => $this->opentoken,
+        ];
+        $body = null;
+        if ($params) {
+            $body = json_encode($params);
+            $headers['Content-Type'] = 'application/json';
+        }
+        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
+        $result = json_decode($response['body'], true);
+        if (isset($result['ret']) && $result['ret'] == 0) {
+            return $result;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $domains = $config['domainList'];
@@ -77,11 +100,6 @@ class lucky implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
@@ -89,26 +107,8 @@ class lucky implements DeployInterface
         }
     }
 
-    private function request($path, $params = null, $method = null)
+    public function setLogger($func)
     {
-        $url = $this->url . $path;
-
-        $headers = [
-            'openToken' => $this->opentoken,
-        ];
-        $body = null;
-        if ($params) {
-            $body = json_encode($params);
-            $headers['Content-Type'] = 'application/json';
-        }
-        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        $result = json_decode($response['body'], true);
-        if (isset($result['ret']) && $result['ret'] == 0) {
-            return $result;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
-        }
+        $this->logger = $func;
     }
 }

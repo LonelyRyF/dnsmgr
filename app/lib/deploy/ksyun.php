@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Ksyun as KsyunClient;
+use app\lib\DeployInterface;
 use Exception;
 
 class ksyun implements DeployInterface
@@ -65,15 +65,15 @@ class ksyun implements DeployInterface
         $this->log('CDN证书部署成功，证书ID：' . $result['CertificateId']);
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

@@ -103,13 +103,6 @@ class AliyunNew
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalURI($path)
     {
         if (empty($path)) return '/';
@@ -119,6 +112,13 @@ class AliyunNew
         }, $pattens);
         $canonicalURI = implode('/', $pattens);
         return $canonicalURI;
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalQueryString($parameters)

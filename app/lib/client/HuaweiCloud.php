@@ -33,10 +33,14 @@ class HuaweiCloud
     public function request($method, $path, $query = null, $params = null)
     {
         if (!empty($query)) {
-            $query = array_filter($query, function ($a) { return $a !== null;});
+            $query = array_filter($query, function ($a) {
+                return $a !== null;
+            });
         }
         if (!empty($params)) {
-            $params = array_filter($params, function ($a) { return $a !== null;});
+            $params = array_filter($params, function ($a) {
+                return $a !== null;
+            });
         }
 
         $time = time();
@@ -97,13 +101,6 @@ class HuaweiCloud
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalURI($path)
     {
         if (empty($path)) return '/';
@@ -114,6 +111,13 @@ class HuaweiCloud
         $canonicalURI = implode('/', $pattens);
         if (substr($canonicalURI, -1) != '/') $canonicalURI .= '/';
         return $canonicalURI;
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalQueryString($parameters)

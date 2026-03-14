@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\AWS as AWSClient;
+use app\lib\DeployInterface;
 use Exception;
 
 class aws implements DeployInterface
@@ -38,33 +38,6 @@ class aws implements DeployInterface
         }
     }
 
-    private function deploy_cloudfront($fullchain, $privatekey, $config, &$info)
-    {
-        if (empty($config['distribution_id'])) throw new Exception('分配ID不能为空');
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-
-        $cert_id = isset($info['cert_id']) ? $info['cert_id'] : null;
-        $cert_id = $this->get_cert_id($fullchain, $privatekey, $cert_id);
-        usleep(500000);
-
-        $client = new AWSClient($this->AccessKeyId, $this->SecretAccessKey, 'cloudfront.amazonaws.com', 'cloudfront', '2020-05-31', 'us-east-1', $this->proxy);
-        try {
-            $data = $client->requestXmlN('GET', '/distribution/' . $config['distribution_id'] . '/config', [], null, true);
-        } catch (Exception $e) {
-            throw new Exception('获取分配信息失败：' . $e->getMessage());
-        }
-
-        $data['ViewerCertificate']['ACMCertificateArn'] = $cert_id;
-        $data['ViewerCertificate']['CloudFrontDefaultCertificate'] = 'false';
-        unset($data['ViewerCertificate']['Certificate']);
-        unset($data['ViewerCertificate']['CertificateSource']);
-
-        $xml = new \SimpleXMLElement('<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2020-05-31/"></DistributionConfig>');
-        $client->requestXmlN('PUT', '/distribution/' . $config['distribution_id'] . '/config', $data, $xml);
-        $this->log('分配ID: ' . $config['distribution_id'] . ' 证书部署成功！');
-    }
-
     private function get_cert_id($fullchain, $privatekey, $cert_id = null, $acm = false)
     {
         if ($acm === true && $cert_id == null) {
@@ -92,7 +65,7 @@ class aws implements DeployInterface
                 if ($acm === true) {
                     throw new Exception('获取证书信息失败，请检查ACM ARN是否正确：' . $e->getMessage());
                 }
-                $this->log('证书已被删除：' . $cert_id. '，准备重新上传');
+                $this->log('证书已被删除：' . $cert_id . '，准备重新上传');
             }
         }
 
@@ -136,15 +109,42 @@ class aws implements DeployInterface
         return $cert_id;
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    private function deploy_cloudfront($fullchain, $privatekey, $config, &$info)
+    {
+        if (empty($config['distribution_id'])) throw new Exception('分配ID不能为空');
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+
+        $cert_id = isset($info['cert_id']) ? $info['cert_id'] : null;
+        $cert_id = $this->get_cert_id($fullchain, $privatekey, $cert_id);
+        usleep(500000);
+
+        $client = new AWSClient($this->AccessKeyId, $this->SecretAccessKey, 'cloudfront.amazonaws.com', 'cloudfront', '2020-05-31', 'us-east-1', $this->proxy);
+        try {
+            $data = $client->requestXmlN('GET', '/distribution/' . $config['distribution_id'] . '/config', [], null, true);
+        } catch (Exception $e) {
+            throw new Exception('获取分配信息失败：' . $e->getMessage());
+        }
+
+        $data['ViewerCertificate']['ACMCertificateArn'] = $cert_id;
+        $data['ViewerCertificate']['CloudFrontDefaultCertificate'] = 'false';
+        unset($data['ViewerCertificate']['Certificate']);
+        unset($data['ViewerCertificate']['CertificateSource']);
+
+        $xml = new \SimpleXMLElement('<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2020-05-31/"></DistributionConfig>');
+        $client->requestXmlN('PUT', '/distribution/' . $config['distribution_id'] . '/config', $data, $xml);
+        $this->log('分配ID: ' . $config['distribution_id'] . ' 证书部署成功！');
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

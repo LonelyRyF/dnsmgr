@@ -3,14 +3,14 @@
 namespace app\controller;
 
 use app\BaseController;
-use Exception;
-use think\facade\Db;
-use think\facade\View;
-use think\facade\Cache;
-use app\service\OptimizeService;
 use app\service\CertTaskService;
 use app\service\ExpireNoticeService;
+use app\service\OptimizeService;
 use app\service\ScheduleService;
+use Exception;
+use think\facade\Cache;
+use think\facade\Db;
+use think\facade\View;
 
 class System extends BaseController
 {
@@ -100,7 +100,7 @@ class System extends BaseController
         $proxy_user = input('post.proxy_user', '', 'trim');
         $proxy_pwd = input('post.proxy_pwd', '', 'trim');
         $proxy_type = input('post.proxy_type', 'http', 'trim');
-        
+
         try {
             check_proxy('https://dl.amh.sh/ip.htm', $proxy_server, $proxy_port, $proxy_type, $proxy_user, $proxy_pwd);
         } catch (Exception $e) {

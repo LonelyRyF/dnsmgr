@@ -71,15 +71,15 @@ class baishan implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

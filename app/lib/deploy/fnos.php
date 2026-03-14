@@ -21,6 +21,31 @@ class fnos implements DeployInterface
         $this->connect();
     }
 
+    private function connect()
+    {
+        if (!function_exists('ssh2_connect')) {
+            throw new Exception('ssh2扩展未安装');
+        }
+        if (empty($this->config['host']) || empty($this->config['port']) || empty($this->config['username']) || empty($this->config['password'])) {
+            throw new Exception('必填参数不能为空');
+        }
+        if (!filter_var($this->config['host'], FILTER_VALIDATE_IP) && !filter_var($this->config['host'], FILTER_VALIDATE_DOMAIN)) {
+            throw new Exception('主机地址不合法');
+        }
+        if (!is_numeric($this->config['port']) || $this->config['port'] < 1 || $this->config['port'] > 65535) {
+            throw new Exception('SSH端口不合法');
+        }
+
+        $connection = ssh2_connect($this->config['host'], intval($this->config['port']));
+        if (!$connection) {
+            throw new Exception('SSH连接失败');
+        }
+        if (!ssh2_auth_password($connection, $this->config['username'], $this->config['password'])) {
+            throw new Exception('用户名或密码错误');
+        }
+        return $connection;
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $domains = $config['domainList'];
@@ -49,11 +74,11 @@ class fnos implements DeployInterface
                 $certPath = $row['certificate'];
                 $keyPath = $row['privateKey'];
                 $certDir = dirname($certPath);
-                $this->exec($connection, '上传证书文件', "sudo tee ".$certPath." > /dev/null <<'EOF'\n".$fullchain."\nEOF");
-                $this->exec($connection, '上传私钥文件', "sudo tee ".$keyPath." > /dev/null <<'EOF'\n".$privatekey."\nEOF");
-                $this->exec($connection, '刷新目录权限', 'sudo chmod 0755 "'.$certDir.'" -R');
-                $this->exec($connection, '更新数据表', 'cd /tmp && sudo -u postgres psql -d trim_connect -c "UPDATE cert SET  valid_to='.$certInfo['validTo_time_t'].'000,valid_from='.$certInfo['validFrom_time_t'].'000,issued_by=\''.$certInfo['issuer']['CN'].'\',updated_time='.getMillisecond().' WHERE private_key=\''.$keyPath.'\'"');
-                $this->log('证书 '.$row['domain'].' 更新成功');
+                $this->exec($connection, '上传证书文件', "sudo tee " . $certPath . " > /dev/null <<'EOF'\n" . $fullchain . "\nEOF");
+                $this->exec($connection, '上传私钥文件', "sudo tee " . $keyPath . " > /dev/null <<'EOF'\n" . $privatekey . "\nEOF");
+                $this->exec($connection, '刷新目录权限', 'sudo chmod 0755 "' . $certDir . '" -R');
+                $this->exec($connection, '更新数据表', 'cd /tmp && sudo -u postgres psql -d trim_connect -c "UPDATE cert SET  valid_to=' . $certInfo['validTo_time_t'] . '000,valid_from=' . $certInfo['validFrom_time_t'] . '000,issued_by=\'' . $certInfo['issuer']['CN'] . '\',updated_time=' . getMillisecond() . ' WHERE private_key=\'' . $keyPath . '\'"');
+                $this->log('证书 ' . $row['domain'] . ' 更新成功');
                 $success++;
             }
         }
@@ -71,7 +96,7 @@ class fnos implements DeployInterface
         $stream = ssh2_exec($connection, $cmd);
         $errorStream = ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
         if (!$stream || !$errorStream) {
-            throw new Exception($name.'执行命令失败');
+            throw new Exception($name . '执行命令失败');
         }
         stream_set_blocking($stream, true);
         stream_set_blocking($errorStream, true);
@@ -83,44 +108,14 @@ class fnos implements DeployInterface
             if (strpos($errorOutput, 'a password is required') !== false) {
                 throw new Exception('权限不足，请先配置 sudo 免密');
             }
-            throw new Exception($name.'失败：' . trim($errorOutput));
+            throw new Exception($name . '失败：' . trim($errorOutput));
         } else {
             if (strlen($output) > 200) {
                 return $output;
             }
-            $this->log($name.'成功 ' . trim($output));
+            $this->log($name . '成功 ' . trim($output));
             return $output;
         }
-    }
-
-    private function connect()
-    {
-        if (!function_exists('ssh2_connect')) {
-            throw new Exception('ssh2扩展未安装');
-        }
-        if (empty($this->config['host']) || empty($this->config['port']) || empty($this->config['username']) || empty($this->config['password'])) {
-            throw new Exception('必填参数不能为空');
-        }
-        if (!filter_var($this->config['host'], FILTER_VALIDATE_IP) && !filter_var($this->config['host'], FILTER_VALIDATE_DOMAIN)) {
-            throw new Exception('主机地址不合法');
-        }
-        if (!is_numeric($this->config['port']) || $this->config['port'] < 1 || $this->config['port'] > 65535) {
-            throw new Exception('SSH端口不合法');
-        }
-
-        $connection = ssh2_connect($this->config['host'], intval($this->config['port']));
-        if (!$connection) {
-            throw new Exception('SSH连接失败');
-        }
-        if (!ssh2_auth_password($connection, $this->config['username'], $this->config['password'])) {
-            throw new Exception('用户名或密码错误');
-        }
-        return $connection;
-    }
-
-    public function setLogger($func)
-    {
-        $this->logger = $func;
     }
 
     private function log($txt)
@@ -128,5 +123,10 @@ class fnos implements DeployInterface
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

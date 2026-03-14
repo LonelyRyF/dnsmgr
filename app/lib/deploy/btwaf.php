@@ -33,6 +33,21 @@ class btwaf implements DeployInterface
         }
     }
 
+    private function request($path, $params)
+    {
+        $url = $this->url . $path;
+
+        $now_time = time();
+        $headers = [
+            'waf_request_time' => $now_time,
+            'waf_request_token' => md5($now_time . md5($this->key)),
+            'Content-Type' => 'application/json',
+        ];
+        $post = $params ? json_encode($params) : null;
+        $response = http_request($url, $post, null, null, $headers, $this->proxy, 'POST');
+        return $response['body'];
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if ($config['type'] == '1') {
@@ -58,6 +73,31 @@ class btwaf implements DeployInterface
         }
         if ($success == 0) {
             throw new Exception($errmsg ? $errmsg : '要部署的网站不存在');
+        }
+    }
+
+    private function deployPanel($fullchain, $privatekey)
+    {
+        $path = '/api/config/set_cert';
+        $data = [
+            'certContent' => $fullchain,
+            'keyContent' => $privatekey,
+        ];
+        $response = $this->request($path, $data);
+        $result = json_decode($response, true);
+        if (isset($result['code']) && $result['code'] == 0) {
+            return true;
+        } elseif (isset($result['res'])) {
+            throw new Exception($result['res']);
+        } else {
+            throw new Exception($response ? $response : '返回数据解析失败');
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
@@ -111,48 +151,8 @@ class btwaf implements DeployInterface
         }
     }
 
-    private function deployPanel($fullchain, $privatekey)
-    {
-        $path = '/api/config/set_cert';
-        $data = [
-            'certContent' => $fullchain,
-            'keyContent' => $privatekey,
-        ];
-        $response = $this->request($path, $data);
-        $result = json_decode($response, true);
-        if (isset($result['code']) && $result['code'] == 0) {
-            return true;
-        } elseif (isset($result['res'])) {
-            throw new Exception($result['res']);
-        } else {
-            throw new Exception($response ? $response : '返回数据解析失败');
-        }
-    }
-
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    private function request($path, $params)
-    {
-        $url = $this->url . $path;
-
-        $now_time = time();
-        $headers = [
-            'waf_request_time' => $now_time,
-            'waf_request_token' => md5($now_time . md5($this->key)),
-            'Content-Type' => 'application/json',
-        ];
-        $post = $params ? json_encode($params) : null;
-        $response = http_request($url, $post, null, null, $headers, $this->proxy, 'POST');
-        return $response['body'];
     }
 }

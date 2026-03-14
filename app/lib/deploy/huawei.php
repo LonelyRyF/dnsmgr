@@ -2,9 +2,9 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\HuaweiCloud;
 use app\lib\client\HuaweiOBS;
+use app\lib\DeployInterface;
 use Exception;
 
 class huawei implements DeployInterface
@@ -68,6 +68,13 @@ class huawei implements DeployInterface
             if (empty($domain)) continue;
             $client->request('PUT', '/v1.1/cdn/configuration/domains/' . $domain . '/configs', null, $param);
             $this->log('CDN域名 ' . $domain . ' 部署证书成功！');
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
@@ -160,12 +167,5 @@ class huawei implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

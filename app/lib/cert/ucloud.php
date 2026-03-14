@@ -30,6 +30,21 @@ class ucloud implements CertInterface
         return true;
     }
 
+    private function request($action, $params)
+    {
+        $this->log('Action:' . $action . PHP_EOL . 'Request:' . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $result = $this->client->request($action, $params);
+        $this->log('Response:' . json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return $result;
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     public function buyCert($domainList, &$order)
     {
         $param = [
@@ -87,7 +102,9 @@ class ucloud implements CertInterface
         return $dnsList;
     }
 
-    public function authOrder($domainList, $order) {}
+    public function authOrder($domainList, $order)
+    {
+    }
 
     public function getAuthStatus($domainList, $order)
     {
@@ -169,20 +186,5 @@ class ucloud implements CertInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    private function request($action, $params)
-    {
-        $this->log('Action:' . $action . PHP_EOL . 'Request:' . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $result = $this->client->request($action, $params);
-        $this->log('Response:' . json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        return $result;
     }
 }

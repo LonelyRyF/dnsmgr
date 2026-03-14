@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\TencentCloud;
+use app\lib\DeployInterface;
 use Exception;
 
 class tencent implements DeployInterface
@@ -92,6 +92,102 @@ class tencent implements DeployInterface
         }
     }
 
+    private function update_cert($fullchain, $privatekey, $config)
+    {
+        if (empty($config['cert_id'])) throw new Exception('证书ID不能为空');
+
+        $param = [
+            'CertificateIds' => [$config['cert_id']],
+            'IsCache' => 1,
+        ];
+        try {
+            $data = $this->client->request('CreateCertificateBindResourceSyncTask', $param);
+            if (empty($data['CertTaskIds'])) throw new Exception('返回任务ID为空');
+        } catch (Exception $e) {
+            throw new Exception('创建关联云资源查询任务失败：' . $e->getMessage());
+        }
+        $task_id = $data['CertTaskIds'][0]['TaskId'];
+        $this->log('创建关联云资源查询任务成功 TaskId=' . $task_id);
+
+        $retry = 0;
+        $resource_result = null;
+        while ($retry++ < 30) {
+            sleep(2);
+            $param = [
+                'TaskIds' => [$task_id],
+            ];
+            try {
+                $data = $this->client->request('DescribeCertificateBindResourceTaskResult', $param);
+                if (empty($data['SyncTaskBindResourceResult'])) throw new Exception('返回结果为空');
+            } catch (Exception $e) {
+                throw new Exception('查询关联云资源任务结果失败：' . $e->getMessage());
+            }
+            $taskResult = $data['SyncTaskBindResourceResult'][0];
+            if ($taskResult['Status'] == 1) {
+                $resource_result = $taskResult['BindResourceResult'];
+                break;
+            } elseif ($taskResult['Status'] == 2) {
+                throw new Exception('关联云资源查询任务执行失败：' . isset($taskResult['Error']) ? $taskResult['Error']['Message'] : '未知错误');
+            }
+        };
+        if (!$resource_result) {
+            throw new Exception('关联云资源查询任务超时未完成，请稍后重试');
+        }
+
+        $resourceTypes = [];
+        $resourceTypesRegions = [];
+        foreach ($resource_result as $res) {
+            if ($res['ResourceType'] != 'clb') continue;
+            $totalCount = 0;
+            $regions = [];
+            foreach ($res['BindResourceRegionResult'] as $regionRes) {
+                if ($regionRes['TotalCount'] > 0) {
+                    $totalCount += $regionRes['TotalCount'];
+                    if (!empty($regionRes['Region'])) {
+                        $regions[] = $regionRes['Region'];
+                    }
+                }
+            }
+            if ($totalCount > 0) {
+                $resourceTypes[] = $res['ResourceType'];
+                if (!empty($regions)) {
+                    $resourceTypesRegions[] = [
+                        'ResourceType' => $res['ResourceType'],
+                        'Regions' => $regions,
+                    ];
+                }
+            }
+        }
+
+        $param = [
+            'OldCertificateId' => $config['cert_id'],
+            'CertificatePublicKey' => $fullchain,
+            'CertificatePrivateKey' => $privatekey,
+            'ResourceTypes' => $resourceTypes,
+            'ResourceTypesRegions' => $resourceTypesRegions,
+        ];
+        $retry = 0;
+        while ($retry++ < 10) {
+            try {
+                $data = $this->client->request('UploadUpdateCertificateInstance', $param);
+            } catch (Exception $e) {
+                throw new Exception('更新证书内容失败：' . $e->getMessage());
+            }
+            if ($data['DeployStatus'] == 1) {
+                break;
+            }
+            sleep(1);
+        }
+        $this->log('更新证书内容成功，可能需要一些时间完成各资源的证书更新部署');
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     private function get_cert_id($fullchain, $privatekey)
     {
         $certInfo = openssl_x509_parse($fullchain, true);
@@ -120,53 +216,6 @@ class tencent implements DeployInterface
         $this->client->request('ModifyCertificatesExpiringNotificationSwitch', $param);
 
         return $data['CertificateId'];
-    }
-
-    private function deploy_common($product, $cert_id, $instance_id)
-    {
-        if (in_array($product, ['cdn', 'waf', 'teo', 'ddos', 'live', 'vod']) && strpos($instance_id, ',') !== false) {
-            $instance_ids = explode(',', $instance_id);
-        } else {
-            $instance_ids = [$instance_id];
-        }
-        if ($product == 'cdn') {
-            $instance_ids = array_map(function ($id) {
-                return $id . '|on';
-            }, $instance_ids);
-        }
-        $param = [
-            'CertificateId' => $cert_id,
-            'InstanceIdList' => $instance_ids,
-            'ResourceType' => $product,
-        ];
-        if ($product == 'live') $param['Status'] = 1;
-        $data = $this->client->request('DeployCertificateInstance', $param);
-        $this->log(json_encode($data));
-        $this->log(strtoupper($product) . '实例 ' . $instance_id . ' 部署证书成功！');
-        return $data['DeployRecordId'];
-    }
-
-    private function deploy_query($record_id)
-    {
-        $param = [
-            'DeployRecordId' => strval($record_id),
-        ];
-        try {
-            $data = $this->client->request('DescribeHostDeployRecordDetail', $param);
-            if (isset($data['SuccessTotalCount']) && $data['SuccessTotalCount'] >= 1 || isset($data['RunningTotalCount']) && $data['RunningTotalCount'] >= 1) {
-                return true;
-            }
-            if (isset($data['FailedTotalCount']) && $data['FailedTotalCount'] >= 1 && !empty($data['DeployRecordDetailList'])) {
-                $errmsg = $data['DeployRecordDetailList'][0]['ErrorMsg'];
-                if (strpos($errmsg, '\u')) {
-                    $errmsg = json_decode($errmsg);
-                }
-                $this->log('证书部署失败原因：' . $errmsg);
-            }
-        } catch (Exception $e) {
-            $this->log('查询证书部署记录失败：' . $e->getMessage());
-        }
-        return false;
     }
 
     private function deploy_clb($cert_id, $config)
@@ -286,104 +335,55 @@ class tencent implements DeployInterface
         $this->log('边缘安全加速域名 ' . $config['domain'] . ' 部署证书成功！');
     }
 
-    private function update_cert($fullchain, $privatekey, $config)
+    private function deploy_common($product, $cert_id, $instance_id)
     {
-        if (empty($config['cert_id'])) throw new Exception('证书ID不能为空');
-
+        if (in_array($product, ['cdn', 'waf', 'teo', 'ddos', 'live', 'vod']) && strpos($instance_id, ',') !== false) {
+            $instance_ids = explode(',', $instance_id);
+        } else {
+            $instance_ids = [$instance_id];
+        }
+        if ($product == 'cdn') {
+            $instance_ids = array_map(function ($id) {
+                return $id . '|on';
+            }, $instance_ids);
+        }
         $param = [
-            'CertificateIds' => [$config['cert_id']],
-            'IsCache' => 1,
+            'CertificateId' => $cert_id,
+            'InstanceIdList' => $instance_ids,
+            'ResourceType' => $product,
+        ];
+        if ($product == 'live') $param['Status'] = 1;
+        $data = $this->client->request('DeployCertificateInstance', $param);
+        $this->log(json_encode($data));
+        $this->log(strtoupper($product) . '实例 ' . $instance_id . ' 部署证书成功！');
+        return $data['DeployRecordId'];
+    }
+
+    private function deploy_query($record_id)
+    {
+        $param = [
+            'DeployRecordId' => strval($record_id),
         ];
         try {
-            $data = $this->client->request('CreateCertificateBindResourceSyncTask', $param);
-            if (empty($data['CertTaskIds'])) throw new Exception('返回任务ID为空');
+            $data = $this->client->request('DescribeHostDeployRecordDetail', $param);
+            if (isset($data['SuccessTotalCount']) && $data['SuccessTotalCount'] >= 1 || isset($data['RunningTotalCount']) && $data['RunningTotalCount'] >= 1) {
+                return true;
+            }
+            if (isset($data['FailedTotalCount']) && $data['FailedTotalCount'] >= 1 && !empty($data['DeployRecordDetailList'])) {
+                $errmsg = $data['DeployRecordDetailList'][0]['ErrorMsg'];
+                if (strpos($errmsg, '\u')) {
+                    $errmsg = json_decode($errmsg);
+                }
+                $this->log('证书部署失败原因：' . $errmsg);
+            }
         } catch (Exception $e) {
-            throw new Exception('创建关联云资源查询任务失败：' . $e->getMessage());
+            $this->log('查询证书部署记录失败：' . $e->getMessage());
         }
-        $task_id = $data['CertTaskIds'][0]['TaskId'];
-        $this->log('创建关联云资源查询任务成功 TaskId=' . $task_id);
-
-        $retry = 0;
-        $resource_result = null;
-        while ($retry++ < 30) {
-            sleep(2);
-            $param = [
-                'TaskIds' => [$task_id],
-            ];
-            try {
-                $data = $this->client->request('DescribeCertificateBindResourceTaskResult', $param);
-                if (empty($data['SyncTaskBindResourceResult'])) throw new Exception('返回结果为空');
-            } catch (Exception $e) {
-                throw new Exception('查询关联云资源任务结果失败：' . $e->getMessage());
-            }
-            $taskResult = $data['SyncTaskBindResourceResult'][0];
-            if ($taskResult['Status'] == 1) {
-                $resource_result = $taskResult['BindResourceResult'];
-                break;
-            } elseif ($taskResult['Status'] == 2) {
-                throw new Exception('关联云资源查询任务执行失败：' . isset($taskResult['Error']) ? $taskResult['Error']['Message'] : '未知错误');
-            }
-        };
-        if (!$resource_result) {
-            throw new Exception('关联云资源查询任务超时未完成，请稍后重试');
-        }
-
-        $resourceTypes = [];
-        $resourceTypesRegions = [];
-        foreach ($resource_result as $res) {
-            if ($res['ResourceType'] != 'clb') continue;
-            $totalCount = 0;
-            $regions = [];
-            foreach ($res['BindResourceRegionResult'] as $regionRes) {
-                if ($regionRes['TotalCount'] > 0) {
-                    $totalCount += $regionRes['TotalCount'];
-                    if (!empty($regionRes['Region'])) {
-                        $regions[] = $regionRes['Region'];
-                    }
-                }
-            }
-            if ($totalCount > 0) {
-                $resourceTypes[] = $res['ResourceType'];
-                if (!empty($regions)) {
-                    $resourceTypesRegions[] = [
-                        'ResourceType' => $res['ResourceType'],
-                        'Regions' => $regions,
-                    ];
-                }
-            }
-        }
-
-        $param = [
-            'OldCertificateId' => $config['cert_id'],
-            'CertificatePublicKey' => $fullchain,
-            'CertificatePrivateKey' => $privatekey,
-            'ResourceTypes' => $resourceTypes,
-            'ResourceTypesRegions' => $resourceTypesRegions,
-        ];
-        $retry = 0;
-        while ($retry++ < 10) {
-            try {
-                $data = $this->client->request('UploadUpdateCertificateInstance', $param);
-            } catch (Exception $e) {
-                throw new Exception('更新证书内容失败：' . $e->getMessage());
-            }
-            if ($data['DeployStatus'] == 1) {
-                break;
-            }
-            sleep(1);
-        }
-        $this->log('更新证书内容成功，可能需要一些时间完成各资源的证书更新部署');
+        return false;
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

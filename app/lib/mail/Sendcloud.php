@@ -12,6 +12,7 @@ class Sendcloud
         $this->apiUser = $apiUser;
         $this->apiKey = $apiKey;
     }
+
     public function send($to, $sub, $msg, $from, $from_name)
     {
         if (empty($this->apiUser) || empty($this->apiKey)) return false;

@@ -28,38 +28,6 @@ class unicloud implements DeployInterface
         $this->login();
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        if (empty($config['domains'])) throw new Exception('绑定的域名不能为空');
-        $this->getToken();
-
-        $url = 'https://unicloud-api.dcloud.net.cn/unicloud/api/host/create-domain-with-cert';
-        foreach (explode(',', $config['domains']) as $domain) {
-            if (empty($domain)) continue;
-            $params = [
-                'appid' => '',
-                'provider' => $config['provider'],
-                'spaceId' => $config['spaceId'],
-                'domain' => $domain,
-                'cert' => rawurlencode($fullchain),
-                'key' => rawurlencode($privatekey),
-            ];
-            $post = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $headers = [
-                'Token' => $this->token,
-            ];
-            $response = http_request($url, $post, null, null, $headers, $this->proxy);
-            $result = json_decode($response['body'], true);
-            if (isset($result['ret']) && $result['ret'] == 0) {
-                $this->log('域名:' . $domain . ' 证书更新成功！');
-            } elseif(isset($result['desc'])) {
-                throw new Exception('域名:' . $domain . ' 证书更新失败:' . $result['desc']);
-            } else {
-                throw new Exception('域名:' . $domain . ' 证书更新失败:' . $response['body']);
-            }
-        }
-    }
-
     private function login()
     {
         $url = 'https://account.dcloud.net.cn/client';
@@ -103,6 +71,81 @@ class unicloud implements DeployInterface
             }
         } else {
             throw new Exception('登录失败:' . $response['body']);
+        }
+    }
+
+    private function getClientInfo($appId, $appName, $appVersion = '1.0.0', $appVersionCode = '100')
+    {
+        $clientInfo = [
+            'PLATFORM' => 'web',
+            'OS' => 'windows',
+            'APPID' => $appId,
+            'DEVICEID' => $this->deviceId,
+            'scene' => 1001,
+            'appId' => $appId,
+            'appLanguage' => 'zh-Hans',
+            'appName' => $appName,
+            'appVersion' => $appVersion,
+            'appVersionCode' => $appVersionCode,
+            'browserName' => 'chrome',
+            'browserVersion' => '122.0.6261.95',
+            'deviceId' => $this->deviceId,
+            'deviceModel' => 'PC',
+            'deviceType' => 'pc',
+            'hostName' => 'chrome',
+            'hostVersion' => '122.0.6261.95',
+            'osName' => 'windows',
+            'osVersion' => '10 x64',
+            'ua' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36',
+            'uniCompilerVersion' => '4.45',
+            'uniPlatform' => 'web',
+            'uniRuntimeVersion' => '4.45',
+            'locale' => 'zh-Hans',
+            'LOCALE' => 'zh-Hans',
+        ];
+        return $clientInfo;
+    }
+
+    private function sign($data, $key)
+    {
+        ksort($data);
+        $signstr = '';
+        foreach ($data as $k => $v) {
+            $signstr .= $k . '=' . $v . '&';
+        }
+        $signstr = rtrim($signstr, '&');
+        return hash_hmac('md5', $signstr, $key);
+    }
+
+    public function deploy($fullchain, $privatekey, $config, &$info)
+    {
+        if (empty($config['domains'])) throw new Exception('绑定的域名不能为空');
+        $this->getToken();
+
+        $url = 'https://unicloud-api.dcloud.net.cn/unicloud/api/host/create-domain-with-cert';
+        foreach (explode(',', $config['domains']) as $domain) {
+            if (empty($domain)) continue;
+            $params = [
+                'appid' => '',
+                'provider' => $config['provider'],
+                'spaceId' => $config['spaceId'],
+                'domain' => $domain,
+                'cert' => rawurlencode($fullchain),
+                'key' => rawurlencode($privatekey),
+            ];
+            $post = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $headers = [
+                'Token' => $this->token,
+            ];
+            $response = http_request($url, $post, null, null, $headers, $this->proxy);
+            $result = json_decode($response['body'], true);
+            if (isset($result['ret']) && $result['ret'] == 0) {
+                $this->log('域名:' . $domain . ' 证书更新成功！');
+            } elseif (isset($result['desc'])) {
+                throw new Exception('域名:' . $domain . ' 证书更新失败:' . $result['desc']);
+            } else {
+                throw new Exception('域名:' . $domain . ' 证书更新失败:' . $response['body']);
+            }
         }
     }
 
@@ -155,58 +198,15 @@ class unicloud implements DeployInterface
         }
     }
 
-    private function getClientInfo($appId, $appName, $appVersion = '1.0.0', $appVersionCode = '100')
-    {
-        $clientInfo = [
-            'PLATFORM' => 'web',
-            'OS' => 'windows',
-            'APPID' => $appId,
-            'DEVICEID' => $this->deviceId,
-            'scene' => 1001,
-            'appId' => $appId,
-            'appLanguage' => 'zh-Hans',
-            'appName' => $appName,
-            'appVersion' => $appVersion,
-            'appVersionCode' => $appVersionCode,
-            'browserName' => 'chrome',
-            'browserVersion' => '122.0.6261.95',
-            'deviceId' => $this->deviceId,
-            'deviceModel' => 'PC',
-            'deviceType' => 'pc',
-            'hostName' => 'chrome',
-            'hostVersion' => '122.0.6261.95',
-            'osName' => 'windows',
-            'osVersion' => '10 x64',
-            'ua' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36',
-            'uniCompilerVersion' => '4.45',
-            'uniPlatform' => 'web',
-            'uniRuntimeVersion' => '4.45',
-            'locale' => 'zh-Hans',
-            'LOCALE' => 'zh-Hans',
-        ];
-        return $clientInfo;
-    }
-
-    private function sign($data, $key)
-    {
-        ksort($data);
-        $signstr = '';
-        foreach ($data as $k => $v) {
-            $signstr .= $k . '=' . $v . '&';
-        }
-        $signstr = rtrim($signstr, '&');
-        return hash_hmac('md5', $signstr, $key);
-    }
-
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

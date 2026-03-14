@@ -33,6 +33,24 @@ class aliyun implements CertInterface
         return true;
     }
 
+    private function request($param, $returnData = false)
+    {
+        $this->log('Request:' . json_encode($param, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $result = $this->client->request($param);
+        $response = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!strpos($response, '"Type":"certificate"')) {
+            $this->log('Response:' . $response);
+        }
+        return $returnData ? $result : true;
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     public function buyCert($domainList, &$order)
     {
         $param = ['Action' => 'DescribePackageState', 'ProductCode' => 'digicert-free-1-free'];
@@ -76,7 +94,9 @@ class aliyun implements CertInterface
         return $dnsList;
     }
 
-    public function authOrder($domainList, $order) {}
+    public function authOrder($domainList, $order)
+    {
+    }
 
     public function getAuthStatus($domainList, $order)
     {
@@ -146,23 +166,5 @@ class aliyun implements CertInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    private function request($param, $returnData = false)
-    {
-        $this->log('Request:' . json_encode($param, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $result = $this->client->request($param);
-        $response = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if (!strpos($response, '"Type":"certificate"')) {
-            $this->log('Response:' . $response);
-        }
-        return $returnData ? $result : true;
     }
 }

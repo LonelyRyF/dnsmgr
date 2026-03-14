@@ -2,9 +2,9 @@
 
 namespace app\utils;
 
+use app\lib\DnsHelper;
 use Exception;
 use think\facade\Db;
-use app\lib\DnsHelper;
 
 class CertDnsUtils
 {
@@ -30,11 +30,11 @@ class CertDnsUtils
                             $cnameDomainList[$cname_row['cnamedomain']][] = $row;
                             unset($list[$key]);
                         } else {
-                            throw new Exception('域名'.$domain.'未在本系统添加');
+                            throw new Exception('域名' . $domain . '未在本系统添加');
                         }
                     }
                 } else {
-                    throw new Exception('域名'.$mainDomain.'未在本系统添加');
+                    throw new Exception('域名' . $mainDomain . '未在本系统添加');
                 }
             }
             if (empty($list)) continue;
@@ -49,7 +49,7 @@ class CertDnsUtils
             foreach ($list as $row) {
                 $domain = $row['name'] . '.' . $mainDomain;
                 if (!isset($records[$row['name']])) $records[$row['name']] = $dns->getSubDomainRecords($row['name'], 1, 100);
-                if (!$records[$row['name']]) throw new Exception('获取'.$domain.'记录列表失败，'.$dns->getError());
+                if (!$records[$row['name']]) throw new Exception('获取' . $domain . '记录列表失败，' . $dns->getError());
 
                 $filter_records = array_filter($records[$row['name']]['list'], function ($v) use ($row) {
                     if (is_array($v['Value'])) $v['Value'] = implode(',', $v['Value']);
@@ -69,14 +69,14 @@ class CertDnsUtils
                     foreach ($filter_records as $recordid => $record) {
                         $dns->deleteDomainRecord($record['RecordId']);
                         unset($records[$row['name']]['list'][$recordid]);
-                        $log('Delete DNS Record: '.$domain.' '.$row['type']);
+                        $log('Delete DNS Record: ' . $domain . ' ' . $row['type']);
                     }
                 }
 
                 $ttl = $drow['type'] == 'namesilo' ? 3600 : 600;
                 $res = $dns->addDomainRecord($row['name'], $row['type'], $row['value'], DnsHelper::$line_name[$drow['type']]['DEF'], $ttl);
-                if (!$res && $row['type'] != 'CAA') throw new Exception('添加'.$domain.'解析记录失败，' . $dns->getError());
-                $log('Add DNS Record: '.$domain.' '.$row['type'].' '.$row['value']);
+                if (!$res && $row['type'] != 'CAA') throw new Exception('添加' . $domain . '解析记录失败，' . $dns->getError());
+                $log('Add DNS Record: ' . $domain . ' ' . $row['type'] . ' ' . $row['value']);
             }
         }
         if (!empty($cnameDomainList)) {
@@ -122,11 +122,11 @@ class CertDnsUtils
                             $cnameDomainList[$cname_row['cnamedomain']][] = $row;
                             unset($list[$key]);
                         } else {
-                            throw new Exception('域名'.$domain.'未在本系统添加');
+                            throw new Exception('域名' . $domain . '未在本系统添加');
                         }
                     }
                 } else {
-                    throw new Exception('域名'.$mainDomain.'未在本系统添加');
+                    throw new Exception('域名' . $mainDomain . '未在本系统添加');
                 }
             }
             if (empty($list)) continue;
@@ -142,7 +142,7 @@ class CertDnsUtils
                 //if ($row['type'] == 'CAA') continue;
                 $domain = $row['name'] . '.' . $mainDomain;
                 if (!isset($records[$row['name']])) $records[$row['name']] = $dns->getSubDomainRecords($row['name'], 1, 100);
-                if (!$records[$row['name']]) throw new Exception('获取'.$domain.'记录列表失败，'.$dns->getError());
+                if (!$records[$row['name']]) throw new Exception('获取' . $domain . '记录列表失败，' . $dns->getError());
 
                 $filter_records = array_filter($records[$row['name']]['list'], function ($v) use ($row) {
                     if (is_array($v['Value'])) $v['Value'] = implode(',', $v['Value']);
@@ -152,7 +152,7 @@ class CertDnsUtils
 
                 foreach ($filter_records as $record) {
                     $dns->deleteDomainRecord($record['RecordId']);
-                    $log('Delete DNS Record: '.$domain.' '.$row['type'].' '.$row['value']);
+                    $log('Delete DNS Record: ' . $domain . ' ' . $row['type'] . ' ' . $row['value']);
                 }
             }
         }

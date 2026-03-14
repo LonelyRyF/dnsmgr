@@ -56,6 +56,58 @@ class powerdns implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_reuqest($method, $path, $params = null)
+    {
+        $url = $this->url . $path;
+        $headers['X-API-Key'] = $this->apikey;
+        $body = null;
+        if ($method == 'GET' || $method == 'DELETE') {
+            if ($params) {
+                $url .= '?' . http_build_query($params);
+            }
+        } else {
+            $body = json_encode($params);
+            $headers['Content-Type'] = 'application/json';
+        }
+        try {
+            $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+
+        $arr = json_decode($response['body'], true);
+        if ($response['code'] < 400) {
+            return is_array($arr) ? $arr : true;
+        } elseif (isset($arr['error'])) {
+            $this->setError($arr['error']);
+            return false;
+        } elseif (isset($arr['errors'])) {
+            $this->setError(implode(',', $arr['errors']));
+            return false;
+        } else {
+            $this->setError($response['body']);
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $data = $this->send_reuqest('GET', '/servers/' . $this->server_id . '/zones/' . $this->domainid);
@@ -122,47 +174,15 @@ class powerdns implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
-    public function addDomainRecord($Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
-    {
-        if ($Type == 'TXT' && substr($Value, 0, 1) != '"') $Value = '"' . $Value . '"';
-        if (($Type == 'CNAME' || $Type == 'MX') && substr($Value, -1) != '.') $Value .= '.';
-        if ($Type == 'MX') $Value = intval($MX) . ' ' . $Value;
-        $records = [];
-        $rrsets = cache('powerdns_' . $this->domainid);
-        if ($rrsets) {
-            $rrsets_filter = array_filter($rrsets, function ($row) use ($Name, $Type) {
-                return $row['host'] == $Name && $row['type'] == $Type;
-            });
-            if (!empty($rrsets_filter)) {
-                $rrset = $rrsets_filter[array_key_first($rrsets_filter)];
-                $records = $rrset['records'];
-                $records_filter = array_filter($records, function ($record) use ($Value) {
-                    return $record['content'] == $Value;
-                });
-                if (!empty($records_filter)) {
-                    $this->setError('已存在相同记录');
-                    return false;
-                }
-            }
-        }
-        $records[] = ['content' => $Value, 'disabled' => false];
-        return $this->rrset_replace($Name, $Type, $TTL, $records, $Remark);
-    }
+    //修改解析记录备注
 
-    //修改解析记录
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         if ($Type == 'TXT' && substr($Value, 0, 1) != '"') $Value = '"' . $Value . '"';
@@ -222,13 +242,87 @@ class powerdns implements DnsInterface
         }
     }
 
-    //修改解析记录备注
+    //删除解析记录
+
+    private function rrset_replace($host, $type, $ttl, $records, $remark = null)
+    {
+        $name = $host == '@' ? $this->domainid : $host . '.' . $this->domainid;
+        $rrset = [
+            'name' => $name,
+            'type' => $type,
+            'ttl' => intval($ttl),
+            'changetype' => 'REPLACE',
+            'records' => $records,
+            'comments' => [],
+        ];
+        if (!empty($remark)) {
+            $rrset['comments'] = [
+                ['account' => '', 'content' => $remark]
+            ];
+        }
+        $param = [
+            'rrsets' => [
+                $rrset
+            ],
+        ];
+        return $this->send_reuqest('PATCH', '/servers/' . $this->server_id . '/zones/' . $this->domainid, $param);
+    }
+
+    //设置解析记录状态
+
+    private function rrset_delete($host, $type)
+    {
+        $name = $host == '@' ? $this->domainid : $host . '.' . $this->domainid;
+        $param = [
+            'rrsets' => [
+                [
+                    'name' => $name,
+                    'type' => $type,
+                    'changetype' => 'DELETE',
+                ]
+            ],
+        ];
+        return $this->send_reuqest('PATCH', '/servers/' . $this->server_id . '/zones/' . $this->domainid, $param);
+    }
+
+    //获取解析记录操作日志
+
+    public function addDomainRecord($Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
+    {
+        if ($Type == 'TXT' && substr($Value, 0, 1) != '"') $Value = '"' . $Value . '"';
+        if (($Type == 'CNAME' || $Type == 'MX') && substr($Value, -1) != '.') $Value .= '.';
+        if ($Type == 'MX') $Value = intval($MX) . ' ' . $Value;
+        $records = [];
+        $rrsets = cache('powerdns_' . $this->domainid);
+        if ($rrsets) {
+            $rrsets_filter = array_filter($rrsets, function ($row) use ($Name, $Type) {
+                return $row['host'] == $Name && $row['type'] == $Type;
+            });
+            if (!empty($rrsets_filter)) {
+                $rrset = $rrsets_filter[array_key_first($rrsets_filter)];
+                $records = $rrset['records'];
+                $records_filter = array_filter($records, function ($record) use ($Value) {
+                    return $record['content'] == $Value;
+                });
+                if (!empty($records_filter)) {
+                    $this->setError('已存在相同记录');
+                    return false;
+                }
+            }
+        }
+        $records[] = ['content' => $Value, 'disabled' => false];
+        return $this->rrset_replace($Name, $Type, $TTL, $records, $Remark);
+    }
+
+    //获取解析线路列表
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取域名信息
+
     public function deleteDomainRecord($RecordId)
     {
         $rrsets = cache('powerdns_' . $this->domainid);
@@ -268,7 +362,8 @@ class powerdns implements DnsInterface
         return $res;
     }
 
-    //设置解析记录状态
+    //获取域名最低TTL
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $rrsets = cache('powerdns_' . $this->domainid);
@@ -303,25 +398,21 @@ class powerdns implements DnsInterface
         return $res;
     }
 
-    //获取解析记录操作日志
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         return ['default' => ['name' => '默认', 'parent' => null]];
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -342,84 +433,5 @@ class powerdns implements DnsInterface
             return ['id' => $result['id'], 'name' => rtrim($result['name'], '.')];
         }
         return false;
-    }
-
-    private function rrset_replace($host, $type, $ttl, $records, $remark = null)
-    {
-        $name = $host == '@' ? $this->domainid : $host . '.' . $this->domainid;
-        $rrset = [
-            'name' => $name,
-            'type' => $type,
-            'ttl' => intval($ttl),
-            'changetype' => 'REPLACE',
-            'records' => $records,
-            'comments' => [],
-        ];
-        if (!empty($remark)) {
-            $rrset['comments'] = [
-                ['account' => '', 'content' => $remark]
-            ];
-        }
-        $param = [
-            'rrsets' => [
-                $rrset
-            ],
-        ];
-        return $this->send_reuqest('PATCH', '/servers/' . $this->server_id . '/zones/' . $this->domainid, $param);
-    }
-
-    private function rrset_delete($host, $type)
-    {
-        $name = $host == '@' ? $this->domainid : $host . '.' . $this->domainid;
-        $param = [
-            'rrsets' => [
-                [
-                    'name' => $name,
-                    'type' => $type,
-                    'changetype' => 'DELETE',
-                ]
-            ],
-        ];
-        return $this->send_reuqest('PATCH', '/servers/' . $this->server_id . '/zones/' . $this->domainid, $param);
-    }
-
-    private function send_reuqest($method, $path, $params = null)
-    {
-        $url = $this->url . $path;
-        $headers['X-API-Key'] = $this->apikey;
-        $body = null;
-        if ($method == 'GET' || $method == 'DELETE') {
-            if ($params) {
-                $url .= '?' . http_build_query($params);
-            }
-        } else {
-            $body = json_encode($params);
-            $headers['Content-Type'] = 'application/json';
-        }
-        try {
-            $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        } catch (Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-
-        $arr = json_decode($response['body'], true);
-        if ($response['code'] < 400) {
-            return is_array($arr) ? $arr : true;
-        } elseif (isset($arr['error'])) {
-            $this->setError($arr['error']);
-            return false;
-        } elseif (isset($arr['errors'])) {
-            $this->setError(implode(',', $arr['errors']));
-            return false;
-        } else {
-            $this->setError($response['body']);
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
     }
 }

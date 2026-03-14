@@ -26,6 +26,25 @@ class west implements DeployInterface
         $this->execute('/vhost/', ['act' => 'products']);
     }
 
+    private function execute($path, $params)
+    {
+        $params['username'] = $this->username;
+        $params['time'] = getMillisecond();
+        $params['token'] = md5($this->username . $this->api_password . $params['time']);
+        $response = http_request($this->baseUrl . $path, str_replace('+', '%20', http_build_query($params)), null, null, null, $this->proxy);
+        $response = mb_convert_encoding($response['body'], 'UTF-8', 'GBK');
+        $arr = json_decode($response, true);
+        if ($arr) {
+            if ($arr['result'] == 200) {
+                return isset($arr['data']) ? $arr['data'] : [];
+            } else {
+                throw new Exception($arr['msg']);
+            }
+        } else {
+            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if (empty($config['sitename'])) throw new Exception('FTP账号不能为空');
@@ -98,34 +117,15 @@ class west implements DeployInterface
         $this->log('虚拟主机' . $config['sitename'] . '部署SSL成功');
     }
 
-    private function execute($path, $params)
+    private function log($txt)
     {
-        $params['username'] = $this->username;
-        $params['time'] = getMillisecond();
-        $params['token'] = md5($this->username . $this->api_password . $params['time']);
-        $response = http_request($this->baseUrl . $path, str_replace('+', '%20', http_build_query($params)), null, null, null, $this->proxy);
-        $response = mb_convert_encoding($response['body'], 'UTF-8', 'GBK');
-        $arr = json_decode($response, true);
-        if ($arr) {
-            if ($arr['result'] == 200) {
-                return isset($arr['data']) ? $arr['data'] : [];
-            } else {
-                throw new Exception($arr['msg']);
-            }
-        } else {
-            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\TencentCloud;
+use app\lib\DnsInterface;
 use Exception;
 
 class dnspod implements DnsInterface
@@ -63,6 +63,35 @@ class dnspod implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_request($action, $param)
+    {
+        try {
+            return $this->client->request($action, $param);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $offset = ($PageNumber - 1) * $PageSize;
@@ -109,14 +138,30 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    //修改解析记录
+
+    private function convertType($type)
     {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+        $convert_dict = ['REDIRECT_URL' => '显性URL', 'FORWARD_URL' => '隐性URL'];
+        if (array_key_exists($type, $convert_dict)) {
+            return $convert_dict[$type];
+        }
+        return $type;
     }
 
-    //获取解析记录详细信息
+    //修改解析记录备注
+
+    private function convertTypeId($type)
+    {
+        $convert_dict = ['显性URL' => 'REDIRECT_URL', '隐性URL' => 'FORWARD_URL'];
+        if (array_key_exists($type, $convert_dict)) {
+            return $convert_dict[$type];
+        }
+        return $type;
+    }
+
+    //删除解析记录
+
     public function getDomainRecordInfo($RecordId)
     {
         $action = 'DescribeRecord';
@@ -141,7 +186,8 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //设置解析记录状态
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $action = 'CreateRecord';
@@ -151,7 +197,19 @@ class dnspod implements DnsInterface
         return is_array($data) ? $data['RecordId'] : false;
     }
 
-    //修改解析记录
+    //获取解析记录操作日志
+
+    private function convertLineCode($line)
+    {
+        $convert_dict = ['default' => '0', 'unicom' => '10=1', 'telecom' => '10=0', 'mobile' => '10=3', 'edu' => '10=2', 'oversea' => '3=0', 'btvn' => '10=22', 'search' => '80=0', 'internal' => '7=0'];
+        if (array_key_exists($line, $convert_dict)) {
+            return $convert_dict[$line];
+        }
+        return $line;
+    }
+
+    //获取解析线路列表
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $action = 'ModifyRecord';
@@ -161,7 +219,6 @@ class dnspod implements DnsInterface
         return is_array($data);
     }
 
-    //修改解析记录备注
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         $action = 'ModifyRecordRemark';
@@ -170,7 +227,8 @@ class dnspod implements DnsInterface
         return is_array($data);
     }
 
-    //删除解析记录
+    //获取域名概览信息
+
     public function deleteDomainRecord($RecordId)
     {
         $action = 'DeleteRecord';
@@ -179,7 +237,8 @@ class dnspod implements DnsInterface
         return is_array($data);
     }
 
-    //设置解析记录状态
+    //获取域名权限
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $Status = $Status == '1' ? 'ENABLE' : 'DISABLE';
@@ -189,7 +248,8 @@ class dnspod implements DnsInterface
         return is_array($data);
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         $action = 'DescribeDomainLogList';
@@ -206,7 +266,8 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //获取解析线路列表
+    //获取等级允许的线路
+
     public function getRecordLine()
     {
         $action = 'DescribeRecordLineCategoryList';
@@ -229,6 +290,8 @@ class dnspod implements DnsInterface
         return false;
     }
 
+    //获取用户信息
+
     private function processLineList(&$list, $line_list, $parent)
     {
         foreach ($line_list as $row) {
@@ -242,49 +305,6 @@ class dnspod implements DnsInterface
         }
     }
 
-    //获取域名概览信息
-    public function getDomainInfo()
-    {
-        $action = 'DescribeDomain';
-        $param = ['Domain' => $this->domain];
-        $data = $this->send_request($action, $param);
-        if ($data) {
-            $this->domainInfo = $data['DomainInfo'];
-            return $data['DomainInfo'];
-        }
-        return false;
-    }
-
-    //获取域名权限
-    public function getDomainPurview()
-    {
-        $action = 'DescribeDomainPurview';
-        $param = ['Domain' => $this->domain];
-        $data = $this->send_request($action, $param);
-        if ($data) {
-            return $data['PurviewList'];
-        }
-        return false;
-    }
-
-    //获取域名最低TTL
-    public function getMinTTL()
-    {
-        if ($this->domainInfo) {
-            return $this->domainInfo['TTL'];
-        }
-        $PurviewList = $this->getDomainPurview();
-        if ($PurviewList) {
-            foreach ($PurviewList as $row) {
-                if ($row['Name'] == '记录 TTL 最低' || $row['Name'] == 'Min TTL value') {
-                    return intval($row['Value']);
-                }
-            }
-        }
-        return false;
-    }
-
-    //获取等级允许的线路
     public function getRecordLineByGrade()
     {
         $action = 'DescribeRecordLineList';
@@ -302,7 +322,51 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //获取用户信息
+    //域名别名列表
+
+    public function getDomainInfo()
+    {
+        $action = 'DescribeDomain';
+        $param = ['Domain' => $this->domain];
+        $data = $this->send_request($action, $param);
+        if ($data) {
+            $this->domainInfo = $data['DomainInfo'];
+            return $data['DomainInfo'];
+        }
+        return false;
+    }
+
+    //添加域名别名
+
+    public function getMinTTL()
+    {
+        if ($this->domainInfo) {
+            return $this->domainInfo['TTL'];
+        }
+        $PurviewList = $this->getDomainPurview();
+        if ($PurviewList) {
+            foreach ($PurviewList as $row) {
+                if ($row['Name'] == '记录 TTL 最低' || $row['Name'] == 'Min TTL value') {
+                    return intval($row['Value']);
+                }
+            }
+        }
+        return false;
+    }
+
+    //删除域名别名
+
+    public function getDomainPurview()
+    {
+        $action = 'DescribeDomainPurview';
+        $param = ['Domain' => $this->domain];
+        $data = $this->send_request($action, $param);
+        if ($data) {
+            return $data['PurviewList'];
+        }
+        return false;
+    }
+
     public function getAccountInfo()
     {
         $action = 'DescribeUserDetail';
@@ -327,7 +391,6 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //域名别名列表
     public function domainAliasList()
     {
         $action = 'DescribeDomainAliasList';
@@ -341,7 +404,6 @@ class dnspod implements DnsInterface
         return false;
     }
 
-    //添加域名别名
     public function addDomainAlias($alias)
     {
         $action = 'CreateDomainAlias';
@@ -353,7 +415,6 @@ class dnspod implements DnsInterface
         return is_array($data);
     }
 
-    //删除域名别名
     public function deleteDomainAlias($id)
     {
         $action = 'DeleteDomainAlias';
@@ -363,49 +424,5 @@ class dnspod implements DnsInterface
         ];
         $data = $this->send_request($action, $param);
         return is_array($data);
-    }
-
-    private function convertLineCode($line)
-    {
-        $convert_dict = ['default' => '0', 'unicom' => '10=1', 'telecom' => '10=0', 'mobile' => '10=3', 'edu' => '10=2', 'oversea' => '3=0', 'btvn' => '10=22', 'search' => '80=0', 'internal' => '7=0'];
-        if (array_key_exists($line, $convert_dict)) {
-            return $convert_dict[$line];
-        }
-        return $line;
-    }
-
-    private function convertType($type)
-    {
-        $convert_dict = ['REDIRECT_URL' => '显性URL', 'FORWARD_URL' => '隐性URL'];
-        if (array_key_exists($type, $convert_dict)) {
-            return $convert_dict[$type];
-        }
-        return $type;
-    }
-
-    private function convertTypeId($type)
-    {
-        $convert_dict = ['显性URL' => 'REDIRECT_URL', '隐性URL' => 'FORWARD_URL'];
-        if (array_key_exists($type, $convert_dict)) {
-            return $convert_dict[$type];
-        }
-        return $type;
-    }
-
-
-    private function send_request($action, $param)
-    {
-        try{
-            return $this->client->request($action, $param);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

@@ -5,9 +5,9 @@ declare (strict_types=1);
 namespace app\middleware;
 
 use Exception;
-use think\facade\Db;
-use think\facade\Config;
 use think\facade\Cache;
+use think\facade\Config;
+use think\facade\Db;
 
 class LoadConfig
 {
@@ -15,12 +15,12 @@ class LoadConfig
      * 处理请求
      *
      * @param \think\Request $request
-     * @param \Closure       $next
+     * @param \Closure $next
      * @return Response
      */
     public function handle($request, \Closure $next)
     {
-        if (!file_exists(app()->getRootPath().'.env')) {
+        if (!file_exists(app()->getRootPath() . '.env')) {
             if (strpos($request->url(), '/install') === false) {
                 return redirect((string)url('/install'))->header([
                     'Cache-Control' => 'no-store, no-cache, must-revalidate',

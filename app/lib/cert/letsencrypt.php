@@ -2,8 +2,8 @@
 
 namespace app\lib\cert;
 
-use app\lib\CertInterface;
 use app\lib\acme\ACMECert;
+use app\lib\CertInterface;
 use Exception;
 
 class letsencrypt implements CertInterface
@@ -43,7 +43,9 @@ class letsencrypt implements CertInterface
         return ['kid' => $kid, 'key' => $key];
     }
 
-    public function buyCert($domainList, &$order) {}
+    public function buyCert($domainList, &$order)
+    {
+    }
 
     public function createOrder($domainList, &$order, $keytype, $keysize)
     {
@@ -104,7 +106,9 @@ class letsencrypt implements CertInterface
         $this->ac->revoke($pem);
     }
 
-    public function cancel($order) {}
+    public function cancel($order)
+    {
+    }
 
     public function setLogger($func)
     {

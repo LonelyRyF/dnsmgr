@@ -2,10 +2,10 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Aliyun as AliyunClient;
 use app\lib\client\AliyunNew as AliyunNewClient;
 use app\lib\client\AliyunOSS;
+use app\lib\DeployInterface;
 use Exception;
 
 class aliyun implements DeployInterface
@@ -77,6 +77,142 @@ class aliyun implements DeployInterface
             $info['cert_id'] = $cert_id;
             $info['cert_name'] = $cert_name;
         }
+    }
+
+    private function deploy_api($fullchain, $privatekey, $config)
+    {
+        $domain = $config['domain'];
+        $groupid = $config['api_groupid'];
+        if (empty($groupid)) throw new Exception('API分组ID不能为空');
+        if (empty($domain)) throw new Exception('API分组绑定域名不能为空');
+
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+
+        $endpoint = 'apigateway.' . $config['regionid'] . '.aliyuncs.com';
+
+        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, $endpoint, '2016-07-14', $this->proxy);
+
+        $param = [
+            'Action' => 'SetDomainCertificate',
+            'GroupId' => $groupid,
+            'DomainName' => $domain,
+            'CertificateName' => $cert_name,
+            'CertificateBody' => $fullchain,
+            'CertificatePrivateKey' => $privatekey,
+        ];
+        $client->request($param);
+
+        $this->log('API网关域名 ' . $domain . ' 部署证书成功！');
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    private function deploy_vod($fullchain, $privatekey, $config)
+    {
+        $domain = $config['domain'];
+        if (empty($domain)) throw new Exception('视频点播绑定域名不能为空');
+        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, 'vod.cn-shanghai.aliyuncs.com', '2017-03-21', $this->proxy);
+        $param = [
+            'Action' => 'SetVodDomainCertificate',
+            'DomainName' => $domain,
+            'SSLProtocol' => 'on',
+            'SSLPub' => $fullchain,
+            'SSLPri' => $privatekey,
+        ];
+        $client->request($param);
+        $this->log('视频点播域名 ' . $domain . ' 部署证书成功！');
+    }
+
+    private function deploy_fc($fullchain, $privatekey, $config)
+    {
+        $domain = $config['domain'];
+        $fc_cname = $config['fc_cname'];
+        if (empty($domain)) throw new Exception('函数计算域名不能为空');
+        if (empty($fc_cname)) throw new Exception('域名CNAME地址不能为空');
+
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+
+        $client = new AliyunNewClient($this->AccessKeyId, $this->AccessKeySecret, $fc_cname, '2023-03-30', $this->proxy);
+
+        try {
+            $data = $client->request('GET', 'GetCustomDomain', '/2023-03-30/custom-domains/' . $domain);
+        } catch (Exception $e) {
+            throw new Exception('获取绑定域名信息失败：' . $e->getMessage());
+        }
+        $this->log('获取函数计算绑定域名信息成功');
+
+        if (isset($data['certConfig']['certificate']) && $data['certConfig']['certificate'] == $fullchain) {
+            $this->log('函数计算域名 ' . $domain . ' 证书已配置，无需重复操作');
+            return;
+        }
+
+        if ($data['protocol'] == 'HTTP') $data['protocol'] = 'HTTP,HTTPS';
+        $data['certConfig']['certName'] = $cert_name;
+        $data['certConfig']['certificate'] = $fullchain;
+        $data['certConfig']['privateKey'] = $privatekey;
+
+        $param = [
+            'authConfig' => $data['authConfig'],
+            'certConfig' => $data['certConfig'],
+            'protocol' => $data['protocol'],
+            'routeConfig' => $data['routeConfig'],
+            'tlsConfig' => $data['tlsConfig'],
+            'wafConfig' => $data['wafConfig'],
+        ];
+        $client->request('PUT', 'UpdateCustomDomain', '/2023-03-30/custom-domains/' . $domain, $param);
+
+        $this->log('函数计算域名 ' . $domain . ' 部署证书成功！');
+    }
+
+    private function deploy_fc2($fullchain, $privatekey, $config)
+    {
+        $domain = $config['domain'];
+        $fc_cname = $config['fc_cname'];
+        if (empty($domain)) throw new Exception('函数计算域名不能为空');
+        if (empty($fc_cname)) throw new Exception('域名CNAME地址不能为空');
+
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) throw new Exception('证书解析失败');
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+
+        $client = new AliyunNewClient($this->AccessKeyId, $this->AccessKeySecret, $fc_cname, '2021-04-06', $this->proxy);
+
+        try {
+            $data = $client->request('GET', 'GetCustomDomain', '/2021-04-06/custom-domains/' . $domain);
+        } catch (Exception $e) {
+            throw new Exception('获取绑定域名信息失败：' . $e->getMessage());
+        }
+        $this->log('获取函数计算绑定域名信息成功');
+
+        if (isset($data['certConfig']['certificate']) && $data['certConfig']['certificate'] == $fullchain) {
+            $this->log('函数计算域名 ' . $domain . ' 证书已配置，无需重复操作');
+            return;
+        }
+
+        if ($data['protocol'] == 'HTTP') $data['protocol'] = 'HTTP,HTTPS';
+        $data['certConfig']['certName'] = $cert_name;
+        $data['certConfig']['certificate'] = $fullchain;
+        $data['certConfig']['privateKey'] = $privatekey;
+
+        $param = [
+            'protocol' => $data['protocol'],
+            'routeConfig' => $data['routeConfig'],
+            'certConfig' => $data['certConfig'],
+            'tlsConfig' => $data['tlsConfig'],
+            'wafConfig' => $data['wafConfig'],
+        ];
+        $client->request('PUT', 'UpdateCustomDomain', '/2021-04-06/custom-domains/' . $domain, $param);
+
+        $this->log('函数计算域名 ' . $domain . ' 部署证书成功！');
     }
 
     private function get_cert_id($fullchain, $privatekey, $config)
@@ -166,66 +302,6 @@ class aliyun implements DeployInterface
         ];
         $client->request($param);
         $this->log('DCDN域名 ' . $domain . ' 部署证书成功！');
-    }
-
-    private function deploy_esa_saas($cas_id, $config)
-    {
-        $sitename = $config['esa_sitename'];
-        $saas_sitename = $config['esa_saas_sitename'];
-        if (empty($sitename)) throw new Exception('ESA站点名称不能为空');
-        if (empty($saas_sitename)) throw new Exception('ESA SAAS域名不能为空');
-
-        if ($config['region'] == 'ap-southeast-1') {
-            $endpoint = 'esa.ap-southeast-1.aliyuncs.com';
-        } else {
-            $endpoint = 'esa.cn-hangzhou.aliyuncs.com';
-        }
-
-        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, $endpoint, '2024-09-10');
-        $param = [
-            'Action' => 'ListSites',
-            'SiteName' => $sitename,
-            'SiteSearchType' => 'exact',
-        ];
-        try {
-            $data = $client->request($param, 'GET');
-        } catch (Exception $e) {
-            throw new Exception('查询ESA站点列表失败：' . $e->getMessage());
-        }
-        if ($data['TotalCount'] == 0) throw new Exception('ESA站点 ' . $sitename . ' 不存在');
-        $this->log('成功查询到' . $data['TotalCount'] . '个ESA站点');
-        $site_id = $data['Sites'][0]['SiteId'];
-        // 查询对应的saas域名
-        $param = [
-            'Action' => 'ListCustomHostnames',
-            'SiteName' => $saas_sitename,
-            'SiteId' => $site_id,
-            'SiteSearchType' => 'exact',
-        ];
-        try {
-            $saas_data = $client->request($param, 'GET');
-        } catch (Exception $e) {
-            throw new Exception('查询ESA saas域名失败：' . $e->getMessage());
-        }
-        if ($saas_data['TotalCount'] == 0) throw new Exception('ESA saas站点 ' . $saas_sitename . ' 不存在');
-        $saas_hostname_id = $saas_data['Hostnames'][0]['HostnameId'];
-
-        $param = [
-            'Action' => 'UpdateCustomHostname',
-            'HostnameId' => $saas_hostname_id,
-            'SslFlag' => 'on',
-            'CertType' => 'cas',
-            'CasId' => $cas_id,
-            'CasRegion' => $config['region'],
-        ];
-        $this->log('ESA SAAS站点部署参数 ' . json_encode($param));
-        try {
-            $saas_deploy_result = $client->request($param);
-            $this->log('ESA SAAS站点部署结果 ' . json_encode($saas_deploy_result));
-        } catch (Exception $e) {
-            throw new Exception('部署失败：' . $e->getMessage());
-        }
-        $this->log('ESA SAAS站点 ' . $saas_sitename . ' 证书添加成功！');
     }
 
     private function deploy_esa($cas_id, $cert_name, $config)
@@ -466,34 +542,6 @@ class aliyun implements DeployInterface
         $this->log('WAF域名 ' . $domain . ' 部署证书成功！');
     }
 
-    private function deploy_api($fullchain, $privatekey, $config)
-    {
-        $domain = $config['domain'];
-        $groupid = $config['api_groupid'];
-        if (empty($groupid)) throw new Exception('API分组ID不能为空');
-        if (empty($domain)) throw new Exception('API分组绑定域名不能为空');
-
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-
-        $endpoint = 'apigateway.' . $config['regionid'] . '.aliyuncs.com';
-
-        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, $endpoint, '2016-07-14', $this->proxy);
-
-        $param = [
-            'Action' => 'SetDomainCertificate',
-            'GroupId' => $groupid,
-            'DomainName' => $domain,
-            'CertificateName' => $cert_name,
-            'CertificateBody' => $fullchain,
-            'CertificatePrivateKey' => $privatekey,
-        ];
-        $client->request($param);
-
-        $this->log('API网关域名 ' . $domain . ' 部署证书成功！');
-    }
-
     private function deploy_ddoscoo($cert_id, $config)
     {
         $domain = $config['domain'];
@@ -528,107 +576,6 @@ class aliyun implements DeployInterface
         ];
         $client->request($param);
         $this->log('设置视频直播域名 ' . $domain . ' 证书成功！');
-    }
-
-    private function deploy_vod($fullchain, $privatekey, $config)
-    {
-        $domain = $config['domain'];
-        if (empty($domain)) throw new Exception('视频点播绑定域名不能为空');
-        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, 'vod.cn-shanghai.aliyuncs.com', '2017-03-21', $this->proxy);
-        $param = [
-            'Action' => 'SetVodDomainCertificate',
-            'DomainName' => $domain,
-            'SSLProtocol' => 'on',
-            'SSLPub' => $fullchain,
-            'SSLPri' => $privatekey,
-        ];
-        $client->request($param);
-        $this->log('视频点播域名 ' . $domain . ' 部署证书成功！');
-    }
-
-    private function deploy_fc($fullchain, $privatekey, $config)
-    {
-        $domain = $config['domain'];
-        $fc_cname = $config['fc_cname'];
-        if (empty($domain)) throw new Exception('函数计算域名不能为空');
-        if (empty($fc_cname)) throw new Exception('域名CNAME地址不能为空');
-
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-
-        $client = new AliyunNewClient($this->AccessKeyId, $this->AccessKeySecret, $fc_cname, '2023-03-30', $this->proxy);
-
-        try {
-            $data = $client->request('GET', 'GetCustomDomain', '/2023-03-30/custom-domains/' . $domain);
-        } catch (Exception $e) {
-            throw new Exception('获取绑定域名信息失败：' . $e->getMessage());
-        }
-        $this->log('获取函数计算绑定域名信息成功');
-
-        if (isset($data['certConfig']['certificate']) && $data['certConfig']['certificate'] == $fullchain) {
-            $this->log('函数计算域名 ' . $domain . ' 证书已配置，无需重复操作');
-            return;
-        }
-
-        if ($data['protocol'] == 'HTTP') $data['protocol'] = 'HTTP,HTTPS';
-        $data['certConfig']['certName'] = $cert_name;
-        $data['certConfig']['certificate'] = $fullchain;
-        $data['certConfig']['privateKey'] = $privatekey;
-
-        $param = [
-            'authConfig' => $data['authConfig'],
-            'certConfig' => $data['certConfig'],
-            'protocol' => $data['protocol'],
-            'routeConfig' => $data['routeConfig'],
-            'tlsConfig' => $data['tlsConfig'],
-            'wafConfig' => $data['wafConfig'],
-        ];
-        $client->request('PUT', 'UpdateCustomDomain', '/2023-03-30/custom-domains/' . $domain, $param);
-
-        $this->log('函数计算域名 ' . $domain . ' 部署证书成功！');
-    }
-
-    private function deploy_fc2($fullchain, $privatekey, $config)
-    {
-        $domain = $config['domain'];
-        $fc_cname = $config['fc_cname'];
-        if (empty($domain)) throw new Exception('函数计算域名不能为空');
-        if (empty($fc_cname)) throw new Exception('域名CNAME地址不能为空');
-
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) throw new Exception('证书解析失败');
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-
-        $client = new AliyunNewClient($this->AccessKeyId, $this->AccessKeySecret, $fc_cname, '2021-04-06', $this->proxy);
-
-        try {
-            $data = $client->request('GET', 'GetCustomDomain', '/2021-04-06/custom-domains/' . $domain);
-        } catch (Exception $e) {
-            throw new Exception('获取绑定域名信息失败：' . $e->getMessage());
-        }
-        $this->log('获取函数计算绑定域名信息成功');
-
-        if (isset($data['certConfig']['certificate']) && $data['certConfig']['certificate'] == $fullchain) {
-            $this->log('函数计算域名 ' . $domain . ' 证书已配置，无需重复操作');
-            return;
-        }
-
-        if ($data['protocol'] == 'HTTP') $data['protocol'] = 'HTTP,HTTPS';
-        $data['certConfig']['certName'] = $cert_name;
-        $data['certConfig']['certificate'] = $fullchain;
-        $data['certConfig']['privateKey'] = $privatekey;
-
-        $param = [
-            'protocol' => $data['protocol'],
-            'routeConfig' => $data['routeConfig'],
-            'certConfig' => $data['certConfig'],
-            'tlsConfig' => $data['tlsConfig'],
-            'wafConfig' => $data['wafConfig'],
-        ];
-        $client->request('PUT', 'UpdateCustomDomain', '/2021-04-06/custom-domains/' . $domain, $param);
-
-        $this->log('函数计算域名 ' . $domain . ' 部署证书成功！');
     }
 
     private function deploy_clb($cert_id, $cert_name, $config)
@@ -828,6 +775,66 @@ class aliyun implements DeployInterface
         }
     }
 
+    private function deploy_esa_saas($cas_id, $config)
+    {
+        $sitename = $config['esa_sitename'];
+        $saas_sitename = $config['esa_saas_sitename'];
+        if (empty($sitename)) throw new Exception('ESA站点名称不能为空');
+        if (empty($saas_sitename)) throw new Exception('ESA SAAS域名不能为空');
+
+        if ($config['region'] == 'ap-southeast-1') {
+            $endpoint = 'esa.ap-southeast-1.aliyuncs.com';
+        } else {
+            $endpoint = 'esa.cn-hangzhou.aliyuncs.com';
+        }
+
+        $client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, $endpoint, '2024-09-10');
+        $param = [
+            'Action' => 'ListSites',
+            'SiteName' => $sitename,
+            'SiteSearchType' => 'exact',
+        ];
+        try {
+            $data = $client->request($param, 'GET');
+        } catch (Exception $e) {
+            throw new Exception('查询ESA站点列表失败：' . $e->getMessage());
+        }
+        if ($data['TotalCount'] == 0) throw new Exception('ESA站点 ' . $sitename . ' 不存在');
+        $this->log('成功查询到' . $data['TotalCount'] . '个ESA站点');
+        $site_id = $data['Sites'][0]['SiteId'];
+        // 查询对应的saas域名
+        $param = [
+            'Action' => 'ListCustomHostnames',
+            'SiteName' => $saas_sitename,
+            'SiteId' => $site_id,
+            'SiteSearchType' => 'exact',
+        ];
+        try {
+            $saas_data = $client->request($param, 'GET');
+        } catch (Exception $e) {
+            throw new Exception('查询ESA saas域名失败：' . $e->getMessage());
+        }
+        if ($saas_data['TotalCount'] == 0) throw new Exception('ESA saas站点 ' . $saas_sitename . ' 不存在');
+        $saas_hostname_id = $saas_data['Hostnames'][0]['HostnameId'];
+
+        $param = [
+            'Action' => 'UpdateCustomHostname',
+            'HostnameId' => $saas_hostname_id,
+            'SslFlag' => 'on',
+            'CertType' => 'cas',
+            'CasId' => $cas_id,
+            'CasRegion' => $config['region'],
+        ];
+        $this->log('ESA SAAS站点部署参数 ' . json_encode($param));
+        try {
+            $saas_deploy_result = $client->request($param);
+            $this->log('ESA SAAS站点部署结果 ' . json_encode($saas_deploy_result));
+        } catch (Exception $e) {
+            throw new Exception('部署失败：' . $e->getMessage());
+        }
+        $this->log('ESA SAAS站点 ' . $saas_sitename . ' 证书添加成功！');
+    }
+
     private function deploy_ga($cert_id, $config)
     {
         if (empty($config['ga_id'])) throw new Exception('全球加速实例ID不能为空');
@@ -909,12 +916,5 @@ class aliyun implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

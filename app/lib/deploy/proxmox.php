@@ -29,6 +29,29 @@ class proxmox implements DeployInterface
         $this->send_request($path);
     }
 
+    private function send_request($path, $params = null)
+    {
+        $url = $this->url . $path;
+        $headers = ['Authorization' => 'PVEAPIToken=' . $this->api_user . '=' . $this->api_key];
+        $post = $params ? http_build_query($params) : null;
+        $response = http_request($url, $post, null, null, $headers, $this->proxy);
+        if ($response['code'] == 200) {
+            $result = json_decode($response['body'], true);
+            if (isset($result['data'])) {
+                return $result['data'];
+            } elseif (isset($result['errors'])) {
+                if (is_array($result['errors'])) {
+                    $result['errors'] = implode(';', $result['errors']);
+                }
+                throw new Exception($result['errors']);
+            } else {
+                throw new Exception('返回数据解析失败');
+            }
+        } else {
+            throw new Exception('请求失败(httpCode=' . $response['code'] . ', body=' . $response['body'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if (empty($config['node'])) throw new Exception('节点名称不能为空');
@@ -56,38 +79,15 @@ class proxmox implements DeployInterface
         $this->log('节点：' . $config['node'] . ' 证书部署成功！');
     }
 
-    private function send_request($path, $params = null)
+    private function log($txt)
     {
-        $url = $this->url . $path;
-        $headers = ['Authorization' => 'PVEAPIToken=' . $this->api_user . '=' . $this->api_key];
-        $post = $params ? http_build_query($params) : null;
-        $response = http_request($url, $post, null, null, $headers, $this->proxy);
-        if ($response['code'] == 200) {
-            $result = json_decode($response['body'], true);
-            if (isset($result['data'])) {
-                return $result['data'];
-            } elseif (isset($result['errors'])) {
-                if (is_array($result['errors'])) {
-                    $result['errors'] = implode(';', $result['errors']);
-                }
-                throw new Exception($result['errors']);
-            } else {
-                throw new Exception('返回数据解析失败');
-            }
-        } else {
-            throw new Exception('请求失败(httpCode=' . $response['code'] . ', body=' . $response['body'] . ')');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

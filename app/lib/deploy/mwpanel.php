@@ -35,6 +35,18 @@ class mwpanel implements DeployInterface
         }
     }
 
+    private function request($path, $params = null)
+    {
+        $url = $this->url . $path;
+
+        $headers = [
+            'app-id' => $this->appid,
+            'app-secret' => $this->appsecret,
+        ];
+        $response = http_request($url, $params ? http_build_query($params) : null, null, null, $headers, $this->proxy);
+        return $response['body'];
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if ($config['type'] == '1') {
@@ -81,6 +93,13 @@ class mwpanel implements DeployInterface
         }
     }
 
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     private function deploySite($siteName, $fullchain, $privatekey)
     {
         $path = '/site/set_ssl';
@@ -104,24 +123,5 @@ class mwpanel implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    private function request($path, $params = null)
-    {
-        $url = $this->url . $path;
-
-        $headers = [
-            'app-id' => $this->appid,
-            'app-secret' => $this->appsecret,
-        ];
-        $response = http_request($url, $params ? http_build_query($params) : null, null, null, $headers, $this->proxy);
-        return $response['body'];
     }
 }

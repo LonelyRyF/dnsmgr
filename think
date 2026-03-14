@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+
 namespace think;
 
 if (version_compare(PHP_VERSION, '8.0.0', '<')) {

@@ -2,8 +2,8 @@
 
 namespace app\service;
 
-use app\lib\NewDb;
 use app\lib\DnsHelper;
+use app\lib\NewDb;
 use app\utils\CheckUtils;
 use app\utils\MsgNotice;
 
@@ -13,21 +13,6 @@ use app\utils\MsgNotice;
 class TaskRunner
 {
     private $conn;
-
-    private function db()
-    {
-        if (!$this->conn) {
-            $this->conn = NewDb::connect();
-        }
-        return $this->conn;
-    }
-
-    private function closeDb()
-    {
-        if ($this->conn) {
-            $this->conn->close();
-        }
-    }
 
     public function execute($row)
     {
@@ -73,7 +58,7 @@ class TaskRunner
         if ($action > 0) {
             $drow = $this->db()->name('domain')->alias('A')->join('account B', 'A.aid = B.id')->where('A.id', $row['did'])->field('A.*,B.type,B.config')->find();
             if (!$drow) {
-                echo '域名不存在（ID：'.$row['did'].'）'."\n";
+                echo '域名不存在（ID：' . $row['did'] . '）' . "\n";
                 $this->closeDb();
                 return;
             }
@@ -130,6 +115,21 @@ class TaskRunner
 
         if ($row['type'] != 3) {
             MsgNotice::send($action, $row, $result);
+        }
+    }
+
+    private function db()
+    {
+        if (!$this->conn) {
+            $this->conn = NewDb::connect();
+        }
+        return $this->conn;
+    }
+
+    private function closeDb()
+    {
+        if ($this->conn) {
+            $this->conn->close();
         }
     }
 }

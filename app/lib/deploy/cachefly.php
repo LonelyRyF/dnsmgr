@@ -24,16 +24,6 @@ class cachefly implements DeployInterface
         $this->request('/accounts/me');
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        $params = [
-            'certificate' => $fullchain,
-            'certificateKey' => $privatekey,
-        ];
-        $this->request('/certificates', $params);
-        $this->log('证书上传成功！');
-    }
-
     private function request($path, $params = null, $method = null)
     {
         $url = $this->url . $path;
@@ -53,15 +43,25 @@ class cachefly implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function deploy($fullchain, $privatekey, $config, &$info)
+    {
+        $params = [
+            'certificate' => $fullchain,
+            'certificateKey' => $privatekey,
+        ];
+        $this->request('/certificates', $params);
+        $this->log('证书上传成功！');
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

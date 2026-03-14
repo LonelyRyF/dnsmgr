@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\CertHelper;
+use app\lib\DeployInterface;
 use Exception;
 
 class btpanel implements DeployInterface
@@ -45,6 +45,30 @@ class btpanel implements DeployInterface
                 throw new Exception(isset($result['msg']) ? $result['msg'] : '面板地址无法连接');
             }
         }
+    }
+
+    private function request($path, $params, $file = false)
+    {
+        $url = $this->url . $path;
+
+        $now_time = time();
+        $headers = [];
+        if ($file) {
+            $post_data = [
+                ['name' => 'request_token', 'contents' => md5($now_time . md5($this->key))],
+                ['name' => 'request_time', 'contents' => $now_time],
+            ];
+            $post_data = array_merge($post_data, $params);
+            $headers['Content-Type'] = 'multipart/form-data';
+        } else {
+            $post_data = [
+                'request_token' => md5($now_time . md5($this->key)),
+                'request_time' => $now_time
+            ];
+            $post_data = array_merge($post_data, $params);
+        }
+        $response = http_request($url, $post_data, null, null, $headers, $this->proxy);
+        return $response['body'];
     }
 
     public function deploy($fullchain, $privatekey, $config, &$info)
@@ -172,6 +196,71 @@ class btpanel implements DeployInterface
         }
     }
 
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    private function deployDocker($domain, $fullchain, $privatekey)
+    {
+        $path = '/mod/docker/com/set_ssl';
+        $data = [
+            'site_name' => $domain,
+            'key' => $privatekey,
+            'csr' => $fullchain,
+        ];
+        $response = $this->request($path, $data);
+        $result = json_decode($response, true);
+        if (isset($result['status']) && $result['status']) {
+            return true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception($response ? $response : '返回数据解析失败');
+        }
+    }
+
+    private function deployMailSys($domain, $fullchain, $privatekey)
+    {
+        $path = '/plugin?action=a&name=mail_sys&s=set_mail_certificate_multiple';
+        $data = [
+            'domain' => $domain,
+            'key' => $privatekey,
+            'csr' => $fullchain,
+            'act' => 'add',
+        ];
+        $response = $this->request($path, $data);
+        $result = json_decode($response, true);
+        if (isset($result['status']) && $result['status']) {
+            return true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception($response ? $response : '返回数据解析失败');
+        }
+    }
+
+    private function deployIISSite($domain, $pfx_path, $password = '123456')
+    {
+        $path = '/site/set_site_domain_ssl';
+        $data = [
+            'domain' => $domain,
+            'path' => $pfx_path,
+            'password' => $password,
+        ];
+        $response = $this->request($path, $data);
+        $result = json_decode($response, true);
+        if (isset($result['status']) && $result['status']) {
+            return true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception($response ? $response : '返回数据解析失败');
+        }
+    }
+
     private function deploySite($siteName, $fullchain, $privatekey)
     {
         if ($this->version == 1) {
@@ -239,97 +328,8 @@ class btpanel implements DeployInterface
         }
     }
 
-    private function deployIISSite($domain, $pfx_path, $password = '123456')
-    {
-        $path = '/site/set_site_domain_ssl';
-        $data = [
-            'domain' => $domain,
-            'path' => $pfx_path,
-            'password' => $password,
-        ];
-        $response = $this->request($path, $data);
-        $result = json_decode($response, true);
-        if (isset($result['status']) && $result['status']) {
-            return true;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception($response ? $response : '返回数据解析失败');
-        }
-    }
-
-    private function deployMailSys($domain, $fullchain, $privatekey)
-    {
-        $path = '/plugin?action=a&name=mail_sys&s=set_mail_certificate_multiple';
-        $data = [
-            'domain' => $domain,
-            'key' => $privatekey,
-            'csr' => $fullchain,
-            'act' => 'add',
-        ];
-        $response = $this->request($path, $data);
-        $result = json_decode($response, true);
-        if (isset($result['status']) && $result['status']) {
-            return true;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception($response ? $response : '返回数据解析失败');
-        }
-    }
-
-    private function deployDocker($domain, $fullchain, $privatekey)
-    {
-        $path = '/mod/docker/com/set_ssl';
-        $data = [
-            'site_name' => $domain,
-            'key' => $privatekey,
-            'csr' => $fullchain,
-        ];
-        $response = $this->request($path, $data);
-        $result = json_decode($response, true);
-        if (isset($result['status']) && $result['status']) {
-            return true;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception($response ? $response : '返回数据解析失败');
-        }
-    }
-
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    private function request($path, $params, $file = false)
-    {
-        $url = $this->url . $path;
-
-        $now_time = time();
-        $headers = [];
-        if ($file) {
-            $post_data = [
-                ['name' => 'request_token', 'contents' => md5($now_time . md5($this->key))],
-                ['name' => 'request_time', 'contents' => $now_time],
-            ];
-            $post_data = array_merge($post_data, $params);
-            $headers['Content-Type'] = 'multipart/form-data';
-        } else {
-            $post_data = [
-                'request_token' => md5($now_time . md5($this->key)),
-                'request_time' => $now_time
-            ];
-            $post_data = array_merge($post_data, $params);
-        }
-        $response = http_request($url, $post_data, null, null, $headers, $this->proxy);
-        return $response['body'];
     }
 }

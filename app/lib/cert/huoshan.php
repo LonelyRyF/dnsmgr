@@ -28,14 +28,31 @@ class huoshan implements CertInterface
     public function register()
     {
         if (empty($this->AccessKeyId) || empty($this->SecretAccessKey)) throw new Exception('必填参数不能为空');
-        $this->request('GET', 'CertificateGetInstance', ['limit'=>1,'offset'=>0]);
+        $this->request('GET', 'CertificateGetInstance', ['limit' => 1, 'offset' => 0]);
         return true;
+    }
+
+    private function request($method, $action, $params = [], $query = [])
+    {
+        $this->log('Action:' . $action . PHP_EOL . 'Request:' . json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $result = $this->client->request($method, $action, $params, $query);
+        if (is_array($result)) {
+            $this->log('Response:' . json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
+        return $result;
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
     }
 
     public function buyCert($domainList, &$order)
     {
         $data = $this->request('GET', 'CertificateGetOrganization');
-        if(empty($data['content'])) throw new Exception('请先添加信息模板');
+        if (empty($data['content'])) throw new Exception('请先添加信息模板');
         $order['organization_id'] = $data['content'][0]['id'];
     }
 
@@ -51,7 +68,7 @@ class huoshan implements CertInterface
             'validation_type' => 'dns_txt',
         ];
         $instance_id = $this->request('POST', 'QuickApplyCertificate', $param);
-        if(empty($instance_id)) throw new Exception('证书申请失败，证书实例ID为空');
+        if (empty($instance_id)) throw new Exception('证书申请失败，证书实例ID为空');
         $order['instance_id'] = $instance_id;
 
         sleep(3);
@@ -90,13 +107,13 @@ class huoshan implements CertInterface
             'instance_id' => $order['instance_id'],
         ];
         $data = $this->request('GET', 'CertificateGetInstance', $param);
-        if(empty($data['content'])) throw new Exception('证书信息获取失败');
+        if (empty($data['content'])) throw new Exception('证书信息获取失败');
         $data = $data['content'][0];
-        if($data['order_status'] == 300 && $data['certificate_exist'] == 1){
+        if ($data['order_status'] == 300 && $data['certificate_exist'] == 1) {
             return true;
-        }elseif($data['order_status'] == 302){
+        } elseif ($data['order_status'] == 302) {
             throw new Exception('证书申请失败');
-        }else{
+        } else {
             return false;
         }
     }
@@ -114,7 +131,7 @@ class huoshan implements CertInterface
         $fullchain = implode('', $data['ssl']['certificate']['chain']);
         $private_key = $data['ssl']['certificate']['private_key'];
 
-        return ['private_key' => $private_key, 'fullchain' => $fullchain, 'issuer' => $data['issuer'], 'subject' => $data['common_name']['CN'], 'validFrom' => intval($data['certificate_not_before_ms']/1000), 'validTo' => intval($data['certificate_not_after_ms']/1000)];
+        return ['private_key' => $private_key, 'fullchain' => $fullchain, 'issuer' => $data['issuer'], 'subject' => $data['common_name']['CN'], 'validFrom' => intval($data['certificate_not_before_ms'] / 1000), 'validTo' => intval($data['certificate_not_after_ms'] / 1000)];
     }
 
     public function revoke($order, $pem)
@@ -143,22 +160,5 @@ class huoshan implements CertInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-	{
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-	}
-
-    private function request($method, $action, $params = [], $query = [])
-    {
-        $this->log('Action:'.$action.PHP_EOL.'Request:'.json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $result = $this->client->request($method, $action, $params, $query);
-        if (is_array($result)) {
-            $this->log('Response:'.json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        }
-        return $result;
     }
 }

@@ -36,20 +36,22 @@ class TencentCloud
      */
     public function request($action, $param)
     {
-        $param = array_filter($param, function ($a) { return $a !== null;});
+        $param = array_filter($param, function ($a) {
+            return $a !== null;
+        });
         if (!$param) $param = (object)[];
         $payload = json_encode($param);
         $time = time();
         $authorization = $this->generateSign($payload, $time);
         $header = [
-            'Authorization: '.$authorization,
+            'Authorization: ' . $authorization,
             'Content-Type: application/json; charset=utf-8',
-            'X-TC-Action: '.$action,
-            'X-TC-Timestamp: '.$time,
-            'X-TC-Version: '.$this->version,
+            'X-TC-Action: ' . $action,
+            'X-TC-Timestamp: ' . $time,
+            'X-TC-Version: ' . $this->version,
         ];
-        if($this->region) {
-            $header[] = 'X-TC-Region: '.$this->region;
+        if ($this->region) {
+            $header[] = 'X-TC-Region: ' . $this->region;
         }
         $res = $this->curl_post($payload, $header);
         return $res;
@@ -63,42 +65,42 @@ class TencentCloud
         $httpRequestMethod = "POST";
         $canonicalUri = "/";
         $canonicalQueryString = "";
-        $canonicalHeaders = "content-type:application/json; charset=utf-8\n"."host:".$this->endpoint."\n";
+        $canonicalHeaders = "content-type:application/json; charset=utf-8\n" . "host:" . $this->endpoint . "\n";
         $signedHeaders = "content-type;host";
         $hashedRequestPayload = hash("SHA256", $payload);
-        $canonicalRequest = $httpRequestMethod."\n"
-            .$canonicalUri."\n"
-            .$canonicalQueryString."\n"
-            .$canonicalHeaders."\n"
-            .$signedHeaders."\n"
-            .$hashedRequestPayload;
+        $canonicalRequest = $httpRequestMethod . "\n"
+            . $canonicalUri . "\n"
+            . $canonicalQueryString . "\n"
+            . $canonicalHeaders . "\n"
+            . $signedHeaders . "\n"
+            . $hashedRequestPayload;
 
         // step 2: build string to sign
         $date = gmdate("Y-m-d", $time);
-        $credentialScope = $date."/".$this->service."/tc3_request";
+        $credentialScope = $date . "/" . $this->service . "/tc3_request";
         $hashedCanonicalRequest = hash("SHA256", $canonicalRequest);
-        $stringToSign = $algorithm."\n"
-            .$time."\n"
-            .$credentialScope."\n"
-            .$hashedCanonicalRequest;
+        $stringToSign = $algorithm . "\n"
+            . $time . "\n"
+            . $credentialScope . "\n"
+            . $hashedCanonicalRequest;
 
         // step 3: sign string
-        $secretDate = hash_hmac("SHA256", $date, "TC3".$this->SecretKey, true);
+        $secretDate = hash_hmac("SHA256", $date, "TC3" . $this->SecretKey, true);
         $secretService = hash_hmac("SHA256", $this->service, $secretDate, true);
         $secretSigning = hash_hmac("SHA256", "tc3_request", $secretService, true);
         $signature = hash_hmac("SHA256", $stringToSign, $secretSigning);
 
         // step 4: build authorization
         $authorization = $algorithm
-            ." Credential=".$this->SecretId."/".$credentialScope
-            .", SignedHeaders=content-type;host, Signature=".$signature;
+            . " Credential=" . $this->SecretId . "/" . $credentialScope
+            . ", SignedHeaders=content-type;host, Signature=" . $signature;
 
         return $authorization;
     }
 
     private function curl_post($payload, $header)
     {
-        $url = 'https://'.$this->endpoint.'/';
+        $url = 'https://' . $this->endpoint . '/';
         $ch = curl_init($url);
         if ($this->proxy) {
             curl_set_proxy($ch);

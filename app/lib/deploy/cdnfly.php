@@ -40,6 +40,45 @@ class cdnfly implements DeployInterface
         }
     }
 
+    public function login()
+    {
+        $url = $this->url . '/v1/login';
+        $params = [
+            'account' => $this->username,
+            'password' => $this->password,
+        ];
+        $body = json_encode($params);
+        $response = http_request($url, $body, null, null, null, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 0) {
+            return $result['data']['access_token'];
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception('登录失败，返回数据解析失败');
+        }
+    }
+
+    private function request($path, $params = null, $method = null)
+    {
+        $url = $this->url . $path;
+        $headers = ['api-key' => $this->api_key, 'api-secret' => $this->api_secret];
+        $body = null;
+        if ($params) {
+            $headers['Content-Type'] = 'application/json';
+            $body = json_encode($params);
+        }
+        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 0) {
+            return isset($result['data']) ? $result['data'] : null;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception('返回数据解析失败');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $id = $config['id'];
@@ -103,54 +142,15 @@ class cdnfly implements DeployInterface
         $this->log("证书ID:{$id}更新成功！");
     }
 
-    public function login()
+    private function log($txt)
     {
-        $url = $this->url . '/v1/login';
-        $params = [
-            'account' => $this->username,
-            'password' => $this->password,
-        ];
-        $body = json_encode($params);
-        $response = http_request($url, $body, null, null, null, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 0) {
-            return $result['data']['access_token'];
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception('登录失败，返回数据解析失败');
-        }
-    }
-
-    private function request($path, $params = null, $method = null)
-    {
-        $url = $this->url . $path;
-        $headers = ['api-key' => $this->api_key, 'api-secret' => $this->api_secret];
-        $body = null;
-        if ($params) {
-            $headers['Content-Type'] = 'application/json';
-            $body = json_encode($params);
-        }
-        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 0) {
-            return isset($result['data']) ? $result['data'] : null;
-        } elseif (isset($result['msg'])) {
-            throw new Exception($result['msg']);
-        } else {
-            throw new Exception('返回数据解析失败');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

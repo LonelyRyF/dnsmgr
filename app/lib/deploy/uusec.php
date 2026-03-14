@@ -28,28 +28,6 @@ class uusec implements DeployInterface
         $this->login();
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        $id = $config['id'];
-        if (empty($id)) throw new Exception('证书ID不能为空');
-
-        $this->login();
-
-        $params = [
-            'id' => intval($id),
-            'type' => 1,
-            'name' => $config['name'],
-            'crt' => $fullchain,
-            'key' => $privatekey,
-        ];
-        $result = $this->request('/api/v1/certs', $params, 'PUT');
-        if (is_string($result) && $result == 'OK') {
-            $this->log('证书ID:' . $id . '更新成功！');
-        } else {
-            throw new Exception('证书ID:' . $id . '更新失败，' . (isset($result['err']) ? $result['err'] : '未知错误'));
-        }
-    }
-
     private function login()
     {
         $path = '/api/v1/users/login';
@@ -89,9 +67,26 @@ class uusec implements DeployInterface
         }
     }
 
-    public function setLogger($func)
+    public function deploy($fullchain, $privatekey, $config, &$info)
     {
-        $this->logger = $func;
+        $id = $config['id'];
+        if (empty($id)) throw new Exception('证书ID不能为空');
+
+        $this->login();
+
+        $params = [
+            'id' => intval($id),
+            'type' => 1,
+            'name' => $config['name'],
+            'crt' => $fullchain,
+            'key' => $privatekey,
+        ];
+        $result = $this->request('/api/v1/certs', $params, 'PUT');
+        if (is_string($result) && $result == 'OK') {
+            $this->log('证书ID:' . $id . '更新成功！');
+        } else {
+            throw new Exception('证书ID:' . $id . '更新失败，' . (isset($result['err']) ? $result['err'] : '未知错误'));
+        }
     }
 
     private function log($txt)
@@ -99,5 +94,10 @@ class uusec implements DeployInterface
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Ctyun as CtyunClient;
+use app\lib\DeployInterface;
 use Exception;
 
 class ctyun implements DeployInterface
@@ -77,6 +77,13 @@ class ctyun implements DeployInterface
         }
 
         $this->log('CDN域名 ' . $config['domain'] . ' 部署证书成功！');
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
     }
 
     private function deploy_icdn($fullchain, $privatekey, $config)
@@ -213,12 +220,5 @@ class ctyun implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

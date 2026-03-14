@@ -13,6 +13,9 @@ class HuaweiOBS
     private $SecretAccessKey;
     private $Endpoint;
     private $proxy = false;
+    private $signKeyList = array(
+        'acl', 'policy', 'torrent', 'logging', 'location', 'storageinfo', 'quota', 'storagepolicy', 'requestpayment', 'versions', 'versioning', 'versionid', 'uploads', 'uploadid', 'partnumber', 'website', 'notification', 'lifecycle', 'deletebucket', 'delete', 'cors', 'restore', 'tagging', 'response-content-type', 'response-content-language', 'response-expires', 'response-cache-control', 'response-content-disposition', 'response-content-encoding', 'x-image-process', 'backtosource', 'storageclass', 'replication', 'append', 'position', 'x-oss-process', 'CDNNotifyConfiguration', 'attname', 'customdomain', 'directcoldaccess', 'encryption', 'inventory', 'length', 'metadata', 'modify', 'name', 'rename', 'truncate', 'x-image-save-bucket', 'x-image-save-object', 'x-obs-security-token', 'x-obs-callback'
+    );
 
     public function __construct($AccessKeyId, $SecretAccessKey, $Endpoint, $proxy = false)
     {
@@ -44,30 +47,6 @@ class HuaweiOBS
         return $this->request('PUT', '/', $query, $body, $options);
     }
 
-    public function deleteBucketCustomdomain($bucket, $domain)
-    {
-        $options = [
-            'bucket' => $bucket,
-            'key' => '',
-        ];
-        $query = [
-            'customdomain' => $domain
-        ];
-        return $this->request('DELETE', '/', $query, '', $options);
-    }
-
-    public function getBucketCustomdomain($bucket)
-    {
-        $options = [
-            'bucket' => $bucket,
-            'key' => '',
-        ];
-        $query = [
-            'customdomain' => '',
-        ];
-        return $this->request('GET', '/', $query, '', $options);
-    }
-
     private function request($method, $path, $query, $body, $options)
     {
         $hostname = $options['bucket'] . '.' . $this->Endpoint;
@@ -87,43 +66,6 @@ class HuaweiOBS
         return $this->curl($method, $requestUrl, $body, $header);
     }
 
-    private function curl($method, $url, $body, $header)
-    {
-        $ch = curl_init($url);
-        if ($this->proxy) {
-            curl_set_proxy($ch);
-        }
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        if (!empty($body)) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-        }
-        $response = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if ($errno) {
-            $errmsg = curl_error($ch);
-            curl_close($ch);
-            throw new Exception('Curl error: ' . $errmsg);
-        }
-        curl_close($ch);
-
-        if ($httpCode >= 200 && $httpCode < 300) {
-            if (empty($response)) return true;
-            return $this->xml2array($response);
-        }
-        $arr = $this->xml2array($response);
-        if (isset($arr['Message'])) {
-            throw new Exception($arr['Message']);
-        } else {
-            throw new Exception('HTTP Code: ' . $httpCode);
-        }
-    }
-
     private function toQueryString($params = array())
     {
         $temp = array();
@@ -138,15 +80,6 @@ class HuaweiOBS
             }
         }
         return implode('&', $temp);
-    }
-
-    private function xml2array($xml)
-    {
-        if (!$xml) {
-            return false;
-        }
-        LIBXML_VERSION < 20900 && libxml_disable_entity_loader(true);
-        return json_decode(json_encode(simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA), JSON_UNESCAPED_UNICODE), true);
     }
 
     private function getAuthorization($method, $url, $query, $headers, $options)
@@ -226,7 +159,73 @@ class HuaweiOBS
         return $method . "\n" . $contentMd5 . "\n" . $contentType . "\n" . $date . "\n" . $canonicalizedOSSHeaders . $canonicalizedResource;
     }
 
-    private $signKeyList = array(
-        'acl', 'policy', 'torrent', 'logging', 'location', 'storageinfo', 'quota', 'storagepolicy', 'requestpayment', 'versions', 'versioning', 'versionid', 'uploads', 'uploadid', 'partnumber', 'website', 'notification', 'lifecycle', 'deletebucket', 'delete', 'cors', 'restore', 'tagging', 'response-content-type', 'response-content-language', 'response-expires', 'response-cache-control', 'response-content-disposition', 'response-content-encoding', 'x-image-process', 'backtosource', 'storageclass', 'replication', 'append', 'position', 'x-oss-process', 'CDNNotifyConfiguration', 'attname', 'customdomain', 'directcoldaccess', 'encryption', 'inventory', 'length', 'metadata', 'modify', 'name', 'rename', 'truncate', 'x-image-save-bucket', 'x-image-save-object', 'x-obs-security-token', 'x-obs-callback'
-    );
+    private function curl($method, $url, $body, $header)
+    {
+        $ch = curl_init($url);
+        if ($this->proxy) {
+            curl_set_proxy($ch);
+        }
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        if (!empty($body)) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        }
+        $response = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($errno) {
+            $errmsg = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Curl error: ' . $errmsg);
+        }
+        curl_close($ch);
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            if (empty($response)) return true;
+            return $this->xml2array($response);
+        }
+        $arr = $this->xml2array($response);
+        if (isset($arr['Message'])) {
+            throw new Exception($arr['Message']);
+        } else {
+            throw new Exception('HTTP Code: ' . $httpCode);
+        }
+    }
+
+    private function xml2array($xml)
+    {
+        if (!$xml) {
+            return false;
+        }
+        LIBXML_VERSION < 20900 && libxml_disable_entity_loader(true);
+        return json_decode(json_encode(simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA), JSON_UNESCAPED_UNICODE), true);
+    }
+
+    public function deleteBucketCustomdomain($bucket, $domain)
+    {
+        $options = [
+            'bucket' => $bucket,
+            'key' => '',
+        ];
+        $query = [
+            'customdomain' => $domain
+        ];
+        return $this->request('DELETE', '/', $query, '', $options);
+    }
+
+    public function getBucketCustomdomain($bucket)
+    {
+        $options = [
+            'bucket' => $bucket,
+            'key' => '',
+        ];
+        $query = [
+            'customdomain' => '',
+        ];
+        return $this->request('GET', '/', $query, '', $options);
+    }
 }

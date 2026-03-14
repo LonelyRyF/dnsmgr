@@ -57,6 +57,56 @@ class spaceship implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_reuqest($method, $path, $params = null)
+    {
+        $url = $this->baseUrl . $path;
+        $headers = [
+            'X-API-Key' => $this->apiKey,
+            'X-API-Secret' => $this->apiSecret,
+        ];
+        $body = '';
+        if ($method == 'GET') {
+            if ($params) {
+                $url .= '?' . http_build_query($params);
+            }
+        } else {
+            $body = json_encode($params);
+            $headers['Content-Type'] = 'application/json';
+        }
+        try {
+            $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        $arr = json_decode($response['body'], true);
+        if ($response['code'] == 200 || $response['code'] == 204) {
+            return $arr;
+        } elseif (isset($arr['detail'])) {
+            $this->setError($arr['detail']);
+            return false;
+        } else {
+            $this->setError('http code: ' . $response['code']);
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['take' => $PageSize, 'skip' => ($PageNumber - 1) * $PageSize];
@@ -107,8 +157,8 @@ class spaceship implements DnsInterface
                     'UpdateTime' => null,
                 ];
             }
-            if(!isNullOrEmpty($SubDomain)){
-                $list = array_values(array_filter($list, function($v) use ($SubDomain){
+            if (!isNullOrEmpty($SubDomain)) {
+                $list = array_values(array_filter($list, function ($v) use ($SubDomain) {
                     return strcasecmp($v['Name'], $SubDomain) === 0;
                 }));
             }
@@ -117,18 +167,30 @@ class spaceship implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //添加解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
+
+    //修改解析记录
+
+    public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
+    {
+        $item = $this->convertRecordItem($Name, $Type, $Value, $MX);
+        $item['ttl'] = (int)$TTL;
+        $param = [
+            'force' => false,
+            'items' => [
+                $item
+            ]
+        ];
+        $data = $this->send_reuqest('PUT', '/dns/records/' . $this->domain, $param);
+        return !isset($data);
+    }
+
+    //修改解析记录备注
 
     private function convertRecordItem($Name, $Type, $Value, $MX)
     {
@@ -170,22 +232,8 @@ class spaceship implements DnsInterface
         return $item;
     }
 
-    //添加解析记录
-    public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
-    {
-        $item = $this->convertRecordItem($Name, $Type, $Value, $MX);
-        $item['ttl'] = (int)$TTL;
-        $param = [
-            'force' => false,
-            'items' => [
-                $item
-            ]
-        ];
-        $data = $this->send_reuqest('PUT', '/dns/records/' . $this->domain, $param);
-        return !isset($data);
-    }
+    //删除解析记录
 
-    //修改解析记录
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $item = $this->convertRecordItem($Name, $Type, $Value, $MX);
@@ -200,13 +248,15 @@ class spaceship implements DnsInterface
         return !isset($data);
     }
 
-    //修改解析记录备注
+    //设置解析记录状态
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析记录操作日志
+
     public function deleteDomainRecord($RecordId)
     {
         $array = explode("|", $RecordId);
@@ -220,19 +270,18 @@ class spaceship implements DnsInterface
         return !isset($data);
     }
 
-    //设置解析记录状态
+    //获取解析线路列表
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         return false;
     }
 
-    //获取解析记录操作日志
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         return ['default' => ['name' => '默认', 'parent' => null]];
@@ -251,44 +300,5 @@ class spaceship implements DnsInterface
     public function addDomain($Domain)
     {
         return false;
-    }
-
-    private function send_reuqest($method, $path, $params = null)
-    {
-        $url = $this->baseUrl . $path;
-        $headers = [
-            'X-API-Key' => $this->apiKey,
-            'X-API-Secret' => $this->apiSecret,
-        ];
-        $body = '';
-        if ($method == 'GET') {
-            if ($params) {
-                $url .= '?' . http_build_query($params);
-            }
-        } else {
-            $body = json_encode($params);
-            $headers['Content-Type'] = 'application/json';
-        }
-        try {
-            $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        } catch (\Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-        $arr = json_decode($response['body'], true);
-        if ($response['code'] == 200 || $response['code'] == 204) {
-            return $arr;
-        } elseif (isset($arr['detail'])) {
-            $this->setError($arr['detail']);
-            return false;
-        } else {
-            $this->setError('http code: ' . $response['code']);
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
     }
 }

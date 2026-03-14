@@ -2,9 +2,9 @@
 
 namespace app\service;
 
+use app\lib\DeployHelper;
 use Exception;
 use think\facade\Db;
-use app\lib\DeployHelper;
 
 /**
  * SSL证书自动部署
@@ -36,14 +36,14 @@ class CertDeployService
     {
         if ($this->task['status'] >= 1) return;
         if ($this->task['retry'] >= 6 && !$isManual) {
-            throw new Exception('已超出最大重试次数('.$this->task['error'].')', 103);
+            throw new Exception('已超出最大重试次数(' . $this->task['error'] . ')', 103);
         }
 
         $order = Db::name('cert_order')->where('id', $this->task['oid'])->find();
-        if(!$order) throw new Exception('SSL证书订单不存在', 102);
-        if($order['status'] == 4) throw new Exception('SSL证书订单已吊销', 102);
-        if($order['status'] != 3) throw new Exception('SSL证书订单未完成签发', 102);
-        if(empty($order['fullchain']) || empty($order['privatekey'])) throw new Exception('SSL证书或私钥内容不存在', 102);
+        if (!$order) throw new Exception('SSL证书订单不存在', 102);
+        if ($order['status'] == 4) throw new Exception('SSL证书订单已吊销', 102);
+        if ($order['status'] != 3) throw new Exception('SSL证书订单未完成签发', 102);
+        if (empty($order['fullchain']) || empty($order['privatekey'])) throw new Exception('SSL证书或私钥内容不存在', 102);
 
         $this->lockTaskData();
         try {
@@ -54,6 +54,27 @@ class CertDeployService
     }
 
     //部署证书
+
+    private function lockTaskData()
+    {
+        Db::startTrans();
+        try {
+            $isLock = Db::name('cert_deploy')->where('id', $this->task['id'])->lock(true)->value('islock');
+            if ($isLock == 1 && time() - strtotime($this->task['locktime']) < 3600) {
+                throw new Exception('部署任务处理中，请稍后再试');
+            }
+            $update = ['islock' => 1, 'locktime' => date('Y-m-d H:i:s')];
+            if (empty($this->task['processid'])) $this->task['processid'] = $update['processid'] = getSid();
+            Db::name('cert_deploy')->where('id', $this->task['id'])->update($update);
+            Db::commit();
+        } catch (Exception $e) {
+            Db::rollback();
+            throw $e;
+        }
+    }
+
+    //重置任务
+
     public function deploy($fullchain, $privatekey)
     {
         $this->client->setLogger(function ($txt) {
@@ -83,14 +104,19 @@ class CertDeployService
         }
     }
 
-    //重置任务
-    public function reset()
+    private function saveLog($txt)
     {
-        Db::name('cert_deploy')->where('id', $this->task['id'])->data(['status' => 0, 'retry' => 0, 'retrytime' => null, 'issend' => 0, 'islock' => 0])->update();
-        //$file_name = app()->getRuntimePath().'log/'.$this->task['processid'].'.log';
-        //if (file_exists($file_name)) unlink($file_name);
-        $this->task['status'] = 0;
-        $this->task['retry'] = 0;
+        if (empty($this->task['processid'])) return;
+        if (!is_dir(app()->getRuntimePath() . 'log')) mkdir(app()->getRuntimePath() . 'log');
+        $file_name = app()->getRuntimePath() . 'log/' . $this->task['processid'] . '.log';
+        $file_exists = file_exists($file_name);
+        file_put_contents($file_name, $txt . PHP_EOL, FILE_APPEND);
+        if (!$file_exists) {
+            @chmod($file_name, 0777);
+        }
+        if (php_sapi_name() == 'cli') {
+            echo $txt . PHP_EOL;
+        }
     }
 
     private function saveResult($status, $error = null, $retrytime = null)
@@ -100,7 +126,7 @@ class CertDeployService
             $error = mb_strcut($error, 0, 300);
         }
         $update = ['status' => $status, 'error' => $error ? str_replace(["\r", "\n"], '', $error) : null, 'retrytime' => $retrytime];
-        if ($status == 1){
+        if ($status == 1) {
             $update['retry'] = 0;
             $update['lasttime'] = date('Y-m-d H:i:s');
         }
@@ -115,41 +141,17 @@ class CertDeployService
         }
     }
 
-    private function lockTaskData()
-    {
-        Db::startTrans();
-        try {
-            $isLock = Db::name('cert_deploy')->where('id', $this->task['id'])->lock(true)->value('islock');
-            if ($isLock == 1 && time() - strtotime($this->task['locktime']) < 3600) {
-                throw new Exception('部署任务处理中，请稍后再试');
-            }
-            $update = ['islock' => 1, 'locktime' => date('Y-m-d H:i:s')];
-            if (empty($this->task['processid'])) $this->task['processid'] = $update['processid'] = getSid();
-            Db::name('cert_deploy')->where('id', $this->task['id'])->update($update);
-            Db::commit();
-        } catch (Exception $e) {
-            Db::rollback();
-            throw $e;
-        }
-    }
-
     private function unlockTaskData()
     {
         Db::name('cert_deploy')->where('id', $this->task['id'])->update(['islock' => 0]);
     }
 
-    private function saveLog($txt)
+    public function reset()
     {
-        if (empty($this->task['processid'])) return;
-        if (!is_dir(app()->getRuntimePath() . 'log')) mkdir(app()->getRuntimePath() . 'log');
-        $file_name = app()->getRuntimePath().'log/'.$this->task['processid'].'.log';
-        $file_exists = file_exists($file_name);
-        file_put_contents($file_name, $txt . PHP_EOL, FILE_APPEND);
-        if (!$file_exists) {
-            @chmod($file_name, 0777);
-        }
-        if(php_sapi_name() == 'cli'){
-            echo $txt . PHP_EOL;
-        }
+        Db::name('cert_deploy')->where('id', $this->task['id'])->data(['status' => 0, 'retry' => 0, 'retrytime' => null, 'issend' => 0, 'islock' => 0])->update();
+        //$file_name = app()->getRuntimePath().'log/'.$this->task['processid'].'.log';
+        //if (file_exists($file_name)) unlink($file_name);
+        $this->task['status'] = 0;
+        $this->task['retry'] = 0;
     }
 }

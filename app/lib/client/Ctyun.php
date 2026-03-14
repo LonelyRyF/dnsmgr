@@ -33,10 +33,14 @@ class Ctyun
     public function request($method, $path, $query = null, $params = null, $header = null)
     {
         if (!empty($query)) {
-            $query = array_filter($query, function ($a) { return $a !== null;});
+            $query = array_filter($query, function ($a) {
+                return $a !== null;
+            });
         }
         if (!empty($params)) {
-            $params = array_filter($params, function ($a) { return $a !== null;});
+            $params = array_filter($params, function ($a) {
+                return $a !== null;
+            });
         }
 
         $time = time();
@@ -95,13 +99,6 @@ class Ctyun
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalQueryString($parameters)
     {
         if (empty($parameters)) return '';
@@ -111,6 +108,13 @@ class Ctyun
             $canonicalQueryString .= '&' . $this->escape($key) . '=' . $this->escape($value);
         }
         return substr($canonicalQueryString, 1);
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalHeaders($oldheaders)

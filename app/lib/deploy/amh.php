@@ -33,9 +33,9 @@ class amh implements DeployInterface
         $post_data .= '&amapi_sign=' . hash_hmac('sha256', $post_data, $this->apikey);
         $response = $this->request($path, $post_data);
         if ($response['code'] == 302 && strpos($response['redirect_url'], 'amh_token=') !== false) {
-            if(preg_match('/amh_token=([A-Za-z0-9]+)/', $response['redirect_url'], $matches)) {
+            if (preg_match('/amh_token=([A-Za-z0-9]+)/', $response['redirect_url'], $matches)) {
                 return $matches[1];
-            }else{
+            } else {
                 throw new Exception('面板返回数据异常');
             }
         } elseif ($response['code'] == 200 && preg_match('/<p id="error".*?>(.*?)<\/p>/s', $response['body'], $matches)) {
@@ -43,6 +43,14 @@ class amh implements DeployInterface
         } else {
             throw new Exception('面板地址无法连接');
         }
+    }
+
+    private function request($path, $post_data = null)
+    {
+        $url = $this->url . $path;
+        $cookie = 'PHPSESSID=' . hash_hmac('md5', 'php_sessid=' . $this->apikey, $this->apikey);
+        $response = http_request($url, $post_data, null, $cookie, null, $this->proxy);
+        return $response;
     }
 
     public function deploy($fullchain, $privatekey, $config, &$info)
@@ -55,7 +63,7 @@ class amh implements DeployInterface
         foreach (explode("\n", $config['vhost_name']) as $vhost_name) {
             $vhost_name = trim($vhost_name);
             if (empty($vhost_name)) continue;
-            
+
             $path = '/?c=amssl&a=admin_amssl&envs_name=' . $config['env_name'] . '&vhost_name=' . $vhost_name . '&ModuleSort=app';
             $params = [
                 'submit_key_crt' => 'y',
@@ -86,11 +94,6 @@ class amh implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
@@ -98,11 +101,8 @@ class amh implements DeployInterface
         }
     }
 
-    private function request($path, $post_data = null)
+    public function setLogger($func)
     {
-        $url = $this->url . $path;
-        $cookie = 'PHPSESSID=' . hash_hmac('md5', 'php_sessid=' . $this->apikey, $this->apikey);
-        $response = http_request($url, $post_data, null, $cookie, null, $this->proxy);
-        return $response;
+        $this->logger = $func;
     }
 }

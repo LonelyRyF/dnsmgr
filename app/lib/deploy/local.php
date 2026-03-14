@@ -9,9 +9,13 @@ class local implements DeployInterface
 {
     private $logger;
 
-    public function __construct($config) {}
+    public function __construct($config)
+    {
+    }
 
-    public function check() {}
+    public function check()
+    {
+    }
 
     public function deploy($fullchain, $privatekey, $config, &$info)
     {

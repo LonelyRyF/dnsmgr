@@ -75,6 +75,16 @@ class Auth extends BaseController
         return view();
     }
 
+    private function loginUser($user)
+    {
+        Db::name('log')->insert(['uid' => $user['id'], 'action' => '登录后台', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s")]);
+        DB::name('user')->where('id', $user['id'])->update(['lasttime' => date("Y-m-d H:i:s")]);
+        $session = md5($user['id'] . $user['password']);
+        $expiretime = time() + 2562000;
+        $token = authcode("user\t{$user['id']}\t{$session}\t{$expiretime}", 'ENCODE', config_get('sys_key'));
+        cookie('user_token', $token, ['expire' => $expiretime, 'httponly' => true]);
+    }
+
     public function totp()
     {
         $uid = session('pre_login_user');
@@ -131,16 +141,6 @@ class Auth extends BaseController
 
         $this->loginDomain($row);
         return redirect('/record/' . $row['id']);
-    }
-
-    private function loginUser($user)
-    {
-        Db::name('log')->insert(['uid' => $user['id'], 'action' => '登录后台', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s")]);
-        DB::name('user')->where('id', $user['id'])->update(['lasttime' => date("Y-m-d H:i:s")]);
-        $session = md5($user['id'] . $user['password']);
-        $expiretime = time() + 2562000;
-        $token = authcode("user\t{$user['id']}\t{$session}\t{$expiretime}", 'ENCODE', config_get('sys_key'));
-        cookie('user_token', $token, ['expire' => $expiretime, 'httponly' => true]);
     }
 
     private function loginDomain($row)

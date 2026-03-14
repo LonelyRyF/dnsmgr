@@ -32,6 +32,57 @@ class goedge implements DeployInterface
         $this->getAccessToken();
     }
 
+    private function getAccessToken()
+    {
+        $path = '/APIAccessTokenService/getAPIAccessToken';
+        $params = [
+            'type' => $this->usertype,
+            'accessKeyId' => $this->accessKeyId,
+            'accessKey' => $this->accessKey,
+        ];
+        $result = $this->request($path, $params);
+        if (isset($result['token'])) {
+            $this->accessToken = $result['token'];
+        } else {
+            throw new Exception('登录成功，获取AccessToken失败');
+        }
+    }
+
+    private function request($path, $params = null)
+    {
+        $url = $this->url . $path;
+        $headers = [];
+        $body = null;
+        if ($this->accessToken) {
+            if ($this->systype == '1') {
+                $headers['X-Cloud-Access-Token'] = $this->accessToken;
+            } else {
+                $headers['X-Edge-Access-Token'] = $this->accessToken;
+            }
+        }
+        if ($params) {
+            $headers['Content-Type'] = 'application/json';
+            $body = json_encode($params);
+        }
+        $response = http_request($url, $body, null, null, $headers, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 200) {
+            return $result['data'] ?? null;
+        } elseif (isset($result['message'])) {
+            throw new Exception($result['message']);
+        } else {
+            if (!empty($response['body'])) $this->log('Response:' . $response['body']);
+            throw new Exception('返回数据解析失败');
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $domains = $config['domainList'];
@@ -96,59 +147,8 @@ class goedge implements DeployInterface
         }
     }
 
-    private function getAccessToken()
-    {
-        $path = '/APIAccessTokenService/getAPIAccessToken';
-        $params = [
-            'type' => $this->usertype,
-            'accessKeyId' => $this->accessKeyId,
-            'accessKey' => $this->accessKey,
-        ];
-        $result = $this->request($path, $params);
-        if (isset($result['token'])) {
-            $this->accessToken = $result['token'];
-        } else {
-            throw new Exception('登录成功，获取AccessToken失败');
-        }
-    }
-
-    private function request($path, $params = null)
-    {
-        $url = $this->url . $path;
-        $headers = [];
-        $body = null;
-        if ($this->accessToken) {
-            if ($this->systype == '1') {
-                $headers['X-Cloud-Access-Token'] = $this->accessToken;
-            } else {
-                $headers['X-Edge-Access-Token'] = $this->accessToken;
-            }
-        }
-        if ($params) {
-            $headers['Content-Type'] = 'application/json';
-            $body = json_encode($params);
-        }
-        $response = http_request($url, $body, null, null, $headers, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 200) {
-            return $result['data'] ?? null;
-        } elseif (isset($result['message'])) {
-            throw new Exception($result['message']);
-        } else {
-            if (!empty($response['body'])) $this->log('Response:' . $response['body']);
-            throw new Exception('返回数据解析失败');
-        }
-    }
-
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

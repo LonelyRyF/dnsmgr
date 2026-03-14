@@ -12,9 +12,9 @@ class DnsQueryUtils
     {
         $dns_type = ['A' => DNS_A, 'AAAA' => DNS_AAAA, 'CNAME' => DNS_CNAME, 'MX' => DNS_MX, 'TXT' => DNS_TXT];
         if (!array_key_exists($type, $dns_type)) return false;
-        try{
+        try {
             $list = dns_get_record($domain, $dns_type[$type]);
-        }catch(Exception $e){
+        } catch (Exception $e) {
             return false;
         }
         if (!$list || empty($list)) return false;
@@ -40,13 +40,13 @@ class DnsQueryUtils
         $dns_type = ['A' => 1, 'AAAA' => 28, 'CNAME' => 5, 'MX' => 15, 'TXT' => 16, 'SOA' => 6, 'NS' => 2, 'PTR' => 12, 'SRV' => 33, 'CAA' => 257];
         if (!array_key_exists($type, $dns_type)) return false;
         $id = array_rand(self::$doh_servers);
-        $url = self::$doh_servers[$id].'?name='.urlencode($domain).'&type='.$dns_type[$type];
+        $url = self::$doh_servers[$id] . '?name=' . urlencode($domain) . '&type=' . $dns_type[$type];
         $data = get_curl($url);
         $arr = json_decode($data, true);
         if (!$arr) {
             unset(self::$doh_servers[$id]);
             $id = array_rand(self::$doh_servers);
-            $url = self::$doh_servers[$id].'?name='.urlencode($domain).'&type='.$dns_type[$type];
+            $url = self::$doh_servers[$id] . '?name=' . urlencode($domain) . '&type=' . $dns_type[$type];
             $data = get_curl($url);
             $arr = json_decode($data, true);
             if (!$arr) return false;

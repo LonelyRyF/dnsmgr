@@ -3,9 +3,9 @@
 namespace app\controller;
 
 use app\BaseController;
+use think\facade\Cache;
 use think\facade\Db;
 use think\facade\View;
-use think\facade\Cache;
 
 class Dmonitor extends BaseController
 {
@@ -194,7 +194,7 @@ class Dmonitor extends BaseController
         $domains = [];
         $domainList = Db::name('domain')->alias('A')->join('account B', 'A.aid = B.id')->field('A.id,A.name,B.type')->select();
         foreach ($domainList as $row) {
-            $domains[] = ['id'=>$row['id'], 'name'=>$row['name'], 'type'=>$row['type']];
+            $domains[] = ['id' => $row['id'], 'name' => $row['name'], 'type' => $row['type']];
         }
         View::assign('domains', $domains);
 

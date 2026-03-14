@@ -25,11 +25,38 @@ class opanel implements DeployInterface
         $this->request("/settings/search");
     }
 
+    private function request($path, $params = null, $nodeName = null)
+    {
+        $url = $this->url . $path;
+
+        $timestamp = time() . '';
+        $token = md5('1panel' . $this->key . $timestamp);
+        $headers = [
+            '1Panel-Token' => $token,
+            '1Panel-Timestamp' => $timestamp,
+        ];
+        // 只有子节点时才设置 CurrentNode 头，主节点时不设置该头
+        if (!empty($nodeName)) {
+            $headers['CurrentNode'] = $nodeName;
+        }
+        $body = $params ? json_encode($params) : '{}';
+        if ($body) $headers['Content-Type'] = 'application/json';
+        $response = http_request($url, $body, null, null, $headers, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 200) {
+            return $result['data'] ?? null;
+        } elseif (isset($result['message'])) {
+            throw new Exception($result['message']);
+        } else {
+            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         // 解析节点名称列表
         $nodeNames = $this->parseNodeNames($config);
-        
+
         if (isset($config['type']) && $config['type'] == '3') {
             // 面板本身的证书部署
             $params = [
@@ -39,7 +66,7 @@ class opanel implements DeployInterface
                 'sslID' => null,
                 'sslType' => 'import-paste',
             ];
-            
+
             if (empty($nodeNames)) {
                 // 没有指定节点，只部署到主控节点
                 try {
@@ -53,7 +80,7 @@ class opanel implements DeployInterface
                 // 同时部署到主节点和所有指定的子节点
                 $successCount = 0;
                 $failCount = 0;
-                
+
                 // 先更新主节点
                 try {
                     $this->request('/core/settings/ssl/update', $params);
@@ -63,7 +90,7 @@ class opanel implements DeployInterface
                     $this->log("主节点面板证书更新失败：" . $e->getMessage());
                     $failCount++;
                 }
-                
+
                 // 然后更新所有子节点
                 foreach ($nodeNames as $nodeName) {
                     try {
@@ -89,7 +116,7 @@ class opanel implements DeployInterface
             // 同时部署到主节点和所有指定的子节点
             $successCount = 0;
             $failCount = 0;
-            
+
             // 先更新主节点
             try {
                 $this->deployToNode($fullchain, $privatekey, $config, null);
@@ -98,7 +125,7 @@ class opanel implements DeployInterface
                 $this->log("主节点部署失败：" . $e->getMessage());
                 $failCount++;
             }
-            
+
             // 然后更新所有子节点
             foreach ($nodeNames as $nodeName) {
                 try {
@@ -112,6 +139,38 @@ class opanel implements DeployInterface
             if ($failCount > 0 && $successCount == 0) {
                 throw new Exception("所有节点部署失败");
             }
+        }
+    }
+
+    /**
+     * 解析节点名称列表
+     */
+    private function parseNodeNames($config)
+    {
+        if (!isset($config['node_name']) || empty($config['node_name'])) {
+            return [];
+        }
+
+        $nodeNameStr = trim($config['node_name']);
+        if (empty($nodeNameStr)) {
+            return [];
+        }
+
+        // 按行分割，过滤空行
+        $nodeNames = array_filter(
+            array_map('trim', explode("\n", $nodeNameStr)),
+            function ($name) {
+                return !empty($name);
+            }
+        );
+
+        return array_values($nodeNames);
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
@@ -207,64 +266,5 @@ class opanel implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
-    /**
-     * 解析节点名称列表
-     */
-    private function parseNodeNames($config)
-    {
-        if (!isset($config['node_name']) || empty($config['node_name'])) {
-            return [];
-        }
-        
-        $nodeNameStr = trim($config['node_name']);
-        if (empty($nodeNameStr)) {
-            return [];
-        }
-        
-        // 按行分割，过滤空行
-        $nodeNames = array_filter(
-            array_map('trim', explode("\n", $nodeNameStr)),
-            function($name) {
-                return !empty($name);
-            }
-        );
-        
-        return array_values($nodeNames);
-    }
-
-    private function request($path, $params = null, $nodeName = null)
-    {
-        $url = $this->url . $path;
-
-        $timestamp = time() . '';
-        $token = md5('1panel' . $this->key . $timestamp);
-        $headers = [
-            '1Panel-Token' => $token,
-            '1Panel-Timestamp' => $timestamp,
-        ];
-        // 只有子节点时才设置 CurrentNode 头，主节点时不设置该头
-        if (!empty($nodeName)) {
-            $headers['CurrentNode'] = $nodeName;
-        }
-        $body = $params ? json_encode($params) : '{}';
-        if ($body) $headers['Content-Type'] = 'application/json';
-        $response = http_request($url, $body, null, null, $headers, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 200) {
-            return $result['data'] ?? null;
-        } elseif (isset($result['message'])) {
-            throw new Exception($result['message']);
-        } else {
-            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
-        }
     }
 }

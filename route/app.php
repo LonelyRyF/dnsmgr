@@ -15,14 +15,14 @@ use think\facade\Route;
 use think\middleware\SessionInit;
 
 Route::pattern([
-    'id'   => '\d+',
+    'id' => '\d+',
 ]);
 
 Route::any('/install', 'install/index')
-->middleware(ViewOutput::class);
+    ->middleware(ViewOutput::class);
 
 Route::any('/login', 'auth/login')->middleware(SessionInit::class)
-->middleware(ViewOutput::class);
+    ->middleware(ViewOutput::class);
 Route::get('/verifycode', 'auth/verifycode')->middleware(SessionInit::class);
 Route::post('/auth/totp', 'auth/totp')->middleware(SessionInit::class);
 Route::get('/logout', 'auth/logout');
@@ -42,7 +42,7 @@ Route::group(function () {
     Route::post('/user/data', 'user/user_data');
     Route::post('/user/op', 'user/user_op');
     Route::get('/user', 'user/user');
-    
+
     Route::post('/log/data', 'user/log_data');
     Route::get('/log', 'user/log');
 
@@ -113,7 +113,7 @@ Route::group(function () {
     Route::get('/cert/cname', 'cert/cname');
     Route::post('/cert/cname/data', 'cert/cname_data');
     Route::post('/cert/cname/:action', 'cert/cname_op');
-    
+
     Route::get('/cert/certset', 'cert/certset');
 
     Route::post('/schedule/stask/data', 'schedule/stask_data');
@@ -132,12 +132,12 @@ Route::group(function () {
     Route::get('/system/cronset', 'system/cronset');
 
 })->middleware(CheckLogin::class)
-->middleware(ViewOutput::class);
+    ->middleware(ViewOutput::class);
 
 Route::group('api', function () {
     Route::post('/domain/:id', 'domain/domain_info');
     Route::post('/domain', 'domain/domain_data');
-    
+
     Route::post('/record/data/:id', 'domain/record_data');
     Route::post('/record/add/:id', 'domain/record_add');
     Route::post('/record/update/:id', 'domain/record_update');
@@ -150,6 +150,6 @@ Route::group('api', function () {
 
 })->middleware(AuthApi::class);
 
-Route::miss(function() {
+Route::miss(function () {
     return response('404 Not Found')->code(404);
 });

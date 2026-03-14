@@ -80,48 +80,6 @@ class Volcengine
         return $this->curl($method, $url, $body, $header);
     }
 
-    /**
-     * @param string $method 请求方法
-     * @param string $action 方法名称
-     * @param array $params 请求参数
-     * @return array
-     * @throws Exception
-     */
-    public function tos_request($method, $params = [], $query = [])
-    {
-        if (!empty($params)) {
-            $params = array_filter($params, function ($a) {
-                return $a !== null;
-            });
-        }
-
-        $body = '';
-        if ($method != 'GET') {
-            $body = !empty($params) ? json_encode($params) : '';
-        }
-
-        $time = time();
-        $headers = [
-            'Host' => $this->endpoint,
-            'X-Tos-Date' => gmdate("Ymd\THis\Z", $time),
-            'X-Tos-Content-Sha256' => hash("sha256", $body),
-        ];
-        if ($body) {
-            $headers['Content-Type'] = 'application/json';
-        }
-        $path = '/';
-
-        $authorization = $this->generateSign($method, $path, $query, $headers, $body, $time);
-        $headers['Authorization'] = $authorization;
-
-        $url = 'https://' . $this->endpoint . $path . '?' . http_build_query($query);
-        $header = [];
-        foreach ($headers as $key => $value) {
-            $header[] = $key . ': ' . $value;
-        }
-        return $this->curl($method, $url, $body, $header);
-    }
-
     private function generateSign($method, $path, $query, $headers, $body, $time)
     {
         $algorithm = $this->service == 'tos' ? "TOS4-HMAC-SHA256" : "HMAC-SHA256";
@@ -164,13 +122,6 @@ class Volcengine
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalQueryString($parameters)
     {
         if (empty($parameters)) return '';
@@ -180,6 +131,13 @@ class Volcengine
             $canonicalQueryString .= '&' . $this->escape($key) . '=' . $this->escape($value);
         }
         return substr($canonicalQueryString, 1);
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalHeaders($oldheaders)
@@ -248,5 +206,47 @@ class Volcengine
                 throw new Exception('返回数据解析失败(http_code=' . $httpCode . ')');
             }
         }
+    }
+
+    /**
+     * @param string $method 请求方法
+     * @param string $action 方法名称
+     * @param array $params 请求参数
+     * @return array
+     * @throws Exception
+     */
+    public function tos_request($method, $params = [], $query = [])
+    {
+        if (!empty($params)) {
+            $params = array_filter($params, function ($a) {
+                return $a !== null;
+            });
+        }
+
+        $body = '';
+        if ($method != 'GET') {
+            $body = !empty($params) ? json_encode($params) : '';
+        }
+
+        $time = time();
+        $headers = [
+            'Host' => $this->endpoint,
+            'X-Tos-Date' => gmdate("Ymd\THis\Z", $time),
+            'X-Tos-Content-Sha256' => hash("sha256", $body),
+        ];
+        if ($body) {
+            $headers['Content-Type'] = 'application/json';
+        }
+        $path = '/';
+
+        $authorization = $this->generateSign($method, $path, $query, $headers, $body, $time);
+        $headers['Authorization'] = $authorization;
+
+        $url = 'https://' . $this->endpoint . $path . '?' . http_build_query($query);
+        $header = [];
+        foreach ($headers as $key => $value) {
+            $header[] = $key . ': ' . $value;
+        }
+        return $this->curl($method, $url, $body, $header);
     }
 }

@@ -10,6 +10,31 @@ class AliyunOSS
     private $AccessKeySecret;
     private $Endpoint;
     private $proxy = false;
+    private $signKeyList = array(
+        "acl", "uploads", "location", "cors",
+        "logging", "website", "referer", "lifecycle",
+        "delete", "append", "tagging", "objectMeta",
+        "uploadId", "partNumber", "security-token", "x-oss-security-token",
+        "position", "img", "style", "styleName",
+        "replication", "replicationProgress",
+        "replicationLocation", "cname", "bucketInfo",
+        "comp", "qos", "live", "status", "vod",
+        "startTime", "endTime", "symlink",
+        "x-oss-process", "response-content-type", "x-oss-traffic-limit",
+        "response-content-language", "response-expires",
+        "response-cache-control", "response-content-disposition",
+        "response-content-encoding", "udf", "udfName", "udfImage",
+        "udfId", "udfImageDesc", "udfApplication",
+        "udfApplicationLog", "restore", "callback", "callback-var", "qosInfo",
+        "policy", "stat", "encryption", "versions", "versioning", "versionId", "requestPayment",
+        "x-oss-request-payer", "sequential",
+        "inventory", "inventoryId", "continuation-token", "asyncFetch",
+        "worm", "wormId", "wormExtend", "withHashContext",
+        "x-oss-enable-md5", "x-oss-enable-sha1", "x-oss-enable-sha256",
+        "x-oss-hash-ctx", "x-oss-md5-ctx", "transferAcceleration",
+        "regionList", "cloudboxes", "x-oss-ac-source-ip", "x-oss-ac-subnet-mask", "x-oss-ac-vpc-id", "x-oss-ac-forward-allow",
+        "metaQuery", "resourceGroup", "rtc", "x-oss-async-process", "responseHeader"
+    );
 
     public function __construct($AccessKeyId, $AccessKeySecret, $Endpoint, $proxy = false)
     {
@@ -45,43 +70,6 @@ class AliyunOSS
         return $this->request('POST', '/', $query, $body, $options);
     }
 
-    public function deleteBucketCnameCert($bucket, $domain)
-    {
-        $strXml = <<<EOF
-        <?xml version="1.0" encoding="utf-8"?>
-        <BucketCnameConfiguration>
-        </BucketCnameConfiguration>
-        EOF;
-        $xml = new \SimpleXMLElement($strXml);
-        $node = $xml->addChild('Cname');
-        $node->addChild('Domain', $domain);
-        $certNode = $node->addChild('CertificateConfiguration');
-        $certNode->addChild('DeleteCertificate', 'true');
-        $body = $xml->asXML();
-
-        $options = [
-            'bucket' => $bucket,
-            'key' => '',
-        ];
-        $query = [
-            'cname' => '',
-            'comp' => 'add'
-        ];
-        return $this->request('POST', '/', $query, $body, $options);
-    }
-
-    public function getBucketCname($bucket)
-    {
-        $options = [
-            'bucket' => $bucket,
-            'key' => '',
-        ];
-        $query = [
-            'cname' => '',
-        ];
-        return $this->request('GET', '/', $query, null, $options);
-    }
-
     private function request($method, $path, $query, $body, $options)
     {
         $hostname = $options['bucket'] . '.' . $this->Endpoint;
@@ -100,43 +88,6 @@ class AliyunOSS
         return $this->curl($method, $requestUrl, $body, $header);
     }
 
-    private function curl($method, $url, $body, $header)
-    {
-        $ch = curl_init($url);
-        if ($this->proxy) {
-            curl_set_proxy($ch);
-        }
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        if (!empty($body)) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-        }
-        $response = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if ($errno) {
-            $errmsg = curl_error($ch);
-            curl_close($ch);
-            throw new Exception('Curl error: ' . $errmsg);
-        }
-        curl_close($ch);
-
-        if ($httpCode >= 200 && $httpCode < 300) {
-            if (empty($response)) return true;
-            return $this->xml2array($response);
-        }
-        $arr = $this->xml2array($response);
-        if (isset($arr['Message'])) {
-            throw new Exception($arr['Message']);
-        } else {
-            throw new Exception('HTTP Code: ' . $httpCode);
-        }
-    }
-
     private function toQueryString($params = array())
     {
         $temp = array();
@@ -151,15 +102,6 @@ class AliyunOSS
             }
         }
         return implode('&', $temp);
-    }
-
-    private function xml2array($xml)
-    {
-        if (!$xml) {
-            return false;
-        }
-        LIBXML_VERSION < 20900 && libxml_disable_entity_loader(true);
-        return json_decode(json_encode(simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA), JSON_UNESCAPED_UNICODE), true);
     }
 
     private function getAuthorization($method, $url, $query, $headers, $options)
@@ -239,29 +181,86 @@ class AliyunOSS
         return $method . "\n" . $contentMd5 . "\n" . $contentType . "\n" . $date . "\n" . $canonicalizedOSSHeaders . $canonicalizedResource;
     }
 
-    private $signKeyList = array(
-        "acl", "uploads", "location", "cors",
-        "logging", "website", "referer", "lifecycle",
-        "delete", "append", "tagging", "objectMeta",
-        "uploadId", "partNumber", "security-token", "x-oss-security-token",
-        "position", "img", "style", "styleName",
-        "replication", "replicationProgress",
-        "replicationLocation", "cname", "bucketInfo",
-        "comp", "qos", "live", "status", "vod",
-        "startTime", "endTime", "symlink",
-        "x-oss-process", "response-content-type", "x-oss-traffic-limit",
-        "response-content-language", "response-expires",
-        "response-cache-control", "response-content-disposition",
-        "response-content-encoding", "udf", "udfName", "udfImage",
-        "udfId", "udfImageDesc", "udfApplication",
-        "udfApplicationLog", "restore", "callback", "callback-var", "qosInfo",
-        "policy", "stat", "encryption", "versions", "versioning", "versionId", "requestPayment",
-        "x-oss-request-payer", "sequential",
-        "inventory", "inventoryId", "continuation-token", "asyncFetch",
-        "worm", "wormId", "wormExtend", "withHashContext",
-        "x-oss-enable-md5", "x-oss-enable-sha1", "x-oss-enable-sha256",
-        "x-oss-hash-ctx", "x-oss-md5-ctx", "transferAcceleration",
-        "regionList", "cloudboxes", "x-oss-ac-source-ip", "x-oss-ac-subnet-mask", "x-oss-ac-vpc-id", "x-oss-ac-forward-allow",
-        "metaQuery", "resourceGroup", "rtc", "x-oss-async-process", "responseHeader"
-    );
+    private function curl($method, $url, $body, $header)
+    {
+        $ch = curl_init($url);
+        if ($this->proxy) {
+            curl_set_proxy($ch);
+        }
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        if (!empty($body)) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        }
+        $response = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($errno) {
+            $errmsg = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Curl error: ' . $errmsg);
+        }
+        curl_close($ch);
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            if (empty($response)) return true;
+            return $this->xml2array($response);
+        }
+        $arr = $this->xml2array($response);
+        if (isset($arr['Message'])) {
+            throw new Exception($arr['Message']);
+        } else {
+            throw new Exception('HTTP Code: ' . $httpCode);
+        }
+    }
+
+    private function xml2array($xml)
+    {
+        if (!$xml) {
+            return false;
+        }
+        LIBXML_VERSION < 20900 && libxml_disable_entity_loader(true);
+        return json_decode(json_encode(simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA), JSON_UNESCAPED_UNICODE), true);
+    }
+
+    public function deleteBucketCnameCert($bucket, $domain)
+    {
+        $strXml = <<<EOF
+        <?xml version="1.0" encoding="utf-8"?>
+        <BucketCnameConfiguration>
+        </BucketCnameConfiguration>
+        EOF;
+        $xml = new \SimpleXMLElement($strXml);
+        $node = $xml->addChild('Cname');
+        $node->addChild('Domain', $domain);
+        $certNode = $node->addChild('CertificateConfiguration');
+        $certNode->addChild('DeleteCertificate', 'true');
+        $body = $xml->asXML();
+
+        $options = [
+            'bucket' => $bucket,
+            'key' => '',
+        ];
+        $query = [
+            'cname' => '',
+            'comp' => 'add'
+        ];
+        return $this->request('POST', '/', $query, $body, $options);
+    }
+
+    public function getBucketCname($bucket)
+    {
+        $options = [
+            'bucket' => $bucket,
+            'key' => '',
+        ];
+        $query = [
+            'cname' => '',
+        ];
+        return $this->request('GET', '/', $query, null, $options);
+    }
 }

@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\Aliyun as AliyunClient;
+use app\lib\DnsInterface;
 use Exception;
 
 class aliyunesa implements DnsInterface
@@ -22,7 +22,7 @@ class aliyunesa implements DnsInterface
         $this->AccessKeyId = $config['AccessKeyId'];
         $this->AccessKeySecret = $config['AccessKeySecret'];
         if (!empty($config['region'])) {
-            $this->Endpoint = 'esa.'.$config['region'].'.aliyuncs.com';
+            $this->Endpoint = 'esa.' . $config['region'] . '.aliyuncs.com';
         }
         $proxy = isset($config['proxy']) ? $config['proxy'] == 1 : false;
         $this->client = new AliyunClient($this->AccessKeyId, $this->AccessKeySecret, $this->Endpoint, $this->Version, $proxy);
@@ -63,6 +63,36 @@ class aliyunesa implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function request($param, $method, $returnData = false)
+    {
+        if (empty($this->AccessKeyId) || empty($this->AccessKeySecret)) return false;
+        try {
+            $result = $this->client->request($param, $method);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        return $returnData ? $result : true;
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['Action' => 'ListRecords', 'SiteId' => $this->domainid, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize];
@@ -84,7 +114,7 @@ class aliyunesa implements DnsInterface
         if ($data) {
             $list = [];
             foreach ($data['Records'] as $row) {
-                $name = substr($row['RecordName'], 0, - (strlen($this->domain) + 1));
+                $name = substr($row['RecordName'], 0, -(strlen($this->domain) + 1));
                 if ($name == '') $name = '@';
                 $value = $row['Data']['Value'];
                 if ($row['RecordType'] == 'CAA') $value = $row['Data']['Flag'] . ' ' . $row['Data']['Tag'] . ' ' . $row['Data']['Value'];
@@ -116,20 +146,15 @@ class aliyunesa implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         $param = ['Action' => 'GetRecord', 'RecordId' => $RecordId];
         $data = $this->request($param, 'GET', true);
         if ($data) {
             $row = $data['RecordModel'];
-            $name = substr($row['RecordName'], 0, - (strlen($this->domain) + 1));
+            $name = substr($row['RecordName'], 0, -(strlen($this->domain) + 1));
             if ($name == '') $name = '@';
             $value = $row['Data']['Value'];
             if ($row['RecordType'] == 'CAA') $value = $row['Data']['Flag'] . ' ' . $row['Data']['Tag'] . ' ' . $row['Data']['Value'];
@@ -159,7 +184,8 @@ class aliyunesa implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = null, $Weight = null, $Remark = null)
     {
         if ($Name == '@') {
@@ -187,7 +213,8 @@ class aliyunesa implements DnsInterface
         return false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = null, $Weight = null, $Remark = null)
     {
         if ($Name == '@') {
@@ -211,38 +238,42 @@ class aliyunesa implements DnsInterface
         return $this->request($param, 'POST');
     }
 
-    //修改解析记录备注
+    //设置解析记录状态
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析记录操作日志
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['Action' => 'DeleteRecord', 'RecordId' => $RecordId];
         return $this->request($param, 'POST');
     }
 
-    //设置解析记录状态
+    //获取解析线路列表
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         return false;
     }
 
-    //获取解析记录操作日志
+    //获取域名信息
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
+    //获取域名最低TTL
+
     public function getRecordLine()
     {
         return ['0' => ['name' => '仅DNS', 'parent' => null], '1' => ['name' => '已代理', 'parent' => null]];
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         $param = ['Action' => 'GetSite', 'SiteId' => $this->domainid];
@@ -253,7 +284,6 @@ class aliyunesa implements DnsInterface
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return 1;
@@ -262,23 +292,5 @@ class aliyunesa implements DnsInterface
     public function addDomain($Domain)
     {
         return false;
-    }
-
-    private function request($param, $method, $returnData = false)
-    {
-        if (empty($this->AccessKeyId) || empty($this->AccessKeySecret)) return false;
-        try {
-            $result = $this->client->request($param, $method);
-        } catch (Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-        return $returnData ? $result : true;
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

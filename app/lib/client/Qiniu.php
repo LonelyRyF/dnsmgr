@@ -61,39 +61,6 @@ class Qiniu
         return $this->curl($method, $url, $body, $header);
     }
 
-    public function pili_request($method, $path, $query = null, $params = null)
-    {
-        $this->ApiUrl = 'https://pili.qiniuapi.com';
-        $url = $this->ApiUrl . $path;
-        $query_str = null;
-        $body = null;
-        if (!empty($query)) {
-            $query = array_filter($query, function ($a) {
-                return $a !== null;
-            });
-            $query_str = http_build_query($query);
-            $url .= '?' . $query_str;
-        }
-        if (!empty($params)) {
-            $params = array_filter($params, function ($a) {
-                return $a !== null;
-            });
-            $body = json_encode($params);
-        }
-
-        $sign_str = $method . ' ' . $path . ($query_str ? '?' . $query_str : '') . "\nHost: pili.qiniuapi.com" . ($body ? "\nContent-Type: application/json" : '') . "\n\n" . $body;
-        $hmac = hash_hmac('sha1', $sign_str, $this->SecretKey, true);
-        $sign = $this->AccessKey . ':' . $this->base64_urlSafeEncode($hmac);
-
-        $header = [
-            'Authorization: Qiniu ' . $sign,
-        ];
-        if ($body) {
-            $header[] = 'Content-Type: application/json';
-        }
-        return $this->curl($method, $url, $body, $header);
-    }
-
     private function base64_urlSafeEncode($data)
     {
         $find = array('+', '/');
@@ -139,5 +106,38 @@ class Qiniu
                 throw new Exception('返回数据解析失败');
             }
         }
+    }
+
+    public function pili_request($method, $path, $query = null, $params = null)
+    {
+        $this->ApiUrl = 'https://pili.qiniuapi.com';
+        $url = $this->ApiUrl . $path;
+        $query_str = null;
+        $body = null;
+        if (!empty($query)) {
+            $query = array_filter($query, function ($a) {
+                return $a !== null;
+            });
+            $query_str = http_build_query($query);
+            $url .= '?' . $query_str;
+        }
+        if (!empty($params)) {
+            $params = array_filter($params, function ($a) {
+                return $a !== null;
+            });
+            $body = json_encode($params);
+        }
+
+        $sign_str = $method . ' ' . $path . ($query_str ? '?' . $query_str : '') . "\nHost: pili.qiniuapi.com" . ($body ? "\nContent-Type: application/json" : '') . "\n\n" . $body;
+        $hmac = hash_hmac('sha1', $sign_str, $this->SecretKey, true);
+        $sign = $this->AccessKey . ':' . $this->base64_urlSafeEncode($hmac);
+
+        $header = [
+            'Authorization: Qiniu ' . $sign,
+        ];
+        if ($body) {
+            $header[] = 'Content-Type: application/json';
+        }
+        return $this->curl($method, $url, $body, $header);
     }
 }

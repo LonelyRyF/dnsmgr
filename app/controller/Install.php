@@ -2,13 +2,13 @@
 
 namespace app\controller;
 
-use PDO;
-use Exception;
 use app\BaseController;
+use Exception;
+use PDO;
 use think\facade\Cache;
+use think\facade\Db;
 use think\facade\Request;
 use think\facade\View;
-use think\facade\Db;
 
 class Install extends BaseController
 {

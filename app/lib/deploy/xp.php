@@ -33,6 +33,17 @@ class xp implements DeployInterface
         }
     }
 
+    private function request($path, $params = null)
+    {
+        $url = $this->url . $path;
+
+        $headers = [
+            'XP-API-KEY' => $this->apikey,
+        ];
+        $response = http_request($url, $params ? json_encode($params) : null, null, null, $headers, $this->proxy);
+        return $response['body'];
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $path = '/openApi/siteList';
@@ -88,11 +99,6 @@ class xp implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
@@ -100,14 +106,8 @@ class xp implements DeployInterface
         }
     }
 
-    private function request($path, $params = null)
+    public function setLogger($func)
     {
-        $url = $this->url . $path;
-
-        $headers = [
-            'XP-API-KEY' => $this->apikey,
-        ];
-        $response = http_request($url, $params ? json_encode($params) : null, null, null, $headers, $this->proxy);
-        return $response['body'];
+        $this->logger = $func;
     }
 }

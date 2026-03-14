@@ -26,6 +26,35 @@ class upyun implements DeployInterface
         $this->login();
     }
 
+    private function login()
+    {
+        $url = 'https://console.upyun.com/accounts/signin/';
+        $params = [
+            'username' => $this->username,
+            'password' => $this->password,
+        ];
+        $response = http_request($url, http_build_query($params), null, null, null, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if (isset($result['data']['result']) && $result['data']['result'] == true) {
+            $cookie = '';
+            if (isset($response['headers']['set-cookie'])) {
+                foreach ($response['headers']['set-cookie'] as $val) {
+                    $arr = explode('=', $val);
+                    if ($arr[1] == '' || $arr[1] == 'deleted') continue;
+                    $cookie .= $val . '; ';
+                }
+            } else {
+                throw new Exception('登录成功，获取cookie失败');
+            }
+            $this->cookie = $cookie;
+            return true;
+        } elseif (isset($result['data']['message'])) {
+            throw new Exception('登录失败:' . $result['data']['message']);
+        } else {
+            throw new Exception('登录失败');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $this->login();
@@ -99,47 +128,6 @@ class upyun implements DeployInterface
         }
     }
 
-    private function login()
-    {
-        $url = 'https://console.upyun.com/accounts/signin/';
-        $params = [
-            'username' => $this->username,
-            'password' => $this->password,
-        ];
-        $response = http_request($url, http_build_query($params), null, null, null, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if (isset($result['data']['result']) && $result['data']['result'] == true) {
-            $cookie = '';
-            if (isset($response['headers']['set-cookie'])) {
-                foreach ($response['headers']['set-cookie'] as $val) {
-                    $arr = explode('=', $val);
-                    if ($arr[1] == '' || $arr[1] == 'deleted') continue;
-                    $cookie .= $val . '; ';
-                }
-            } else {
-                throw new Exception('登录成功，获取cookie失败');
-            }
-            $this->cookie = $cookie;
-            return true;
-        } elseif (isset($result['data']['message'])) {
-            throw new Exception('登录失败:' . $result['data']['message']);
-        } else {
-            throw new Exception('登录失败');
-        }
-    }
-
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
-    }
-
     /**
      * 判断是否为 EC (ECDSA) 证书
      */
@@ -156,5 +144,17 @@ class upyun implements DeployInterface
         $details = openssl_pkey_get_details($pubKey);
 
         return $details && ($details['type'] ?? 0) === OPENSSL_KEYTYPE_EC;
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

@@ -2,12 +2,19 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\Volcengine;
+use app\lib\DnsInterface;
 use Exception;
 
 class huoshan implements DnsInterface
 {
+    private static $trade_code_list = [
+        'free_inner' => ['level' => 1, 'name' => '免费版', 'ttl' => 600],
+        'professional_inner' => ['level' => 2, 'name' => '专业版', 'ttl' => 300],
+        'enterprise_inner' => ['level' => 3, 'name' => '企业版', 'ttl' => 60],
+        'ultimate_inner' => ['level' => 4, 'name' => '旗舰版', 'ttl' => 1],
+        'ultimate_exclusive_inner' => ['level' => 5, 'name' => '尊享版', 'ttl' => 1],
+    ];
     private $AccessKeyId;
     private $SecretAccessKey;
     private $endpoint = "open.volcengineapi.com";
@@ -19,14 +26,6 @@ class huoshan implements DnsInterface
     private $domainid;
     private $domainInfo;
     private Volcengine $client;
-
-    private static $trade_code_list = [
-        'free_inner' => ['level' => 1, 'name' => '免费版', 'ttl' => 600],
-        'professional_inner' => ['level' => 2, 'name' => '专业版', 'ttl' => 300],
-        'enterprise_inner' => ['level' => 3, 'name' => '企业版', 'ttl' => 60],
-        'ultimate_inner' => ['level' => 4, 'name' => '旗舰版', 'ttl' => 1],
-        'ultimate_exclusive_inner' => ['level' => 5, 'name' => '尊享版', 'ttl' => 1],
-    ];
 
     public function __construct($config)
     {
@@ -73,6 +72,34 @@ class huoshan implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_request($method, $action, $params = [])
+    {
+        try {
+            return $this->client->request($method, $action, $params);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $query = ['ZID' => intval($this->domainid), 'PageNumber' => $PageNumber, 'PageSize' => $PageSize, 'SearchOrder' => 'desc'];
@@ -106,13 +133,8 @@ class huoshan implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         $data = $this->send_request('GET', 'QueryRecord', ['RecordID' => $RecordId]);
@@ -137,7 +159,8 @@ class huoshan implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $params = ['ZID' => intval($this->domainid), 'Host' => $Name, 'Type' => $this->convertType($Type), 'Value' => $Value, 'Line' => $Line, 'TTL' => intval($TTL), 'Remark' => $Remark];
@@ -147,7 +170,15 @@ class huoshan implements DnsInterface
         return is_array($data) ? $data['RecordID'] : false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
+    private function convertType($type)
+    {
+        return $type;
+    }
+
+    //设置解析记录状态
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $params = ['RecordID' => $RecordId, 'Host' => $Name, 'Type' => $this->convertType($Type), 'Value' => $Value, 'Line' => $Line, 'TTL' => intval($TTL), 'Remark' => $Remark];
@@ -157,20 +188,23 @@ class huoshan implements DnsInterface
         return is_array($data);
     }
 
-    //修改解析记录备注
+    //获取解析记录操作日志
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析线路列表
+
     public function deleteDomainRecord($RecordId)
     {
         $data = $this->send_request('POST', 'DeleteRecord', ['RecordID' => $RecordId]);
         return $data;
     }
 
-    //设置解析记录状态
+    //获取域名概览信息
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $params = ['RecordID' => $RecordId, 'Enable' => $Status == '1'];
@@ -178,13 +212,13 @@ class huoshan implements DnsInterface
         return is_array($data);
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         $domainInfo = $this->getDomainInfo();
@@ -213,7 +247,6 @@ class huoshan implements DnsInterface
         return false;
     }
 
-    //获取域名概览信息
     public function getDomainInfo()
     {
         if (!empty($this->domainInfo)) return $this->domainInfo;
@@ -226,7 +259,16 @@ class huoshan implements DnsInterface
         return false;
     }
 
-    //获取域名最低TTL
+    private function getTradeInfo($trade_code)
+    {
+        if (array_key_exists($trade_code, self::$trade_code_list)) {
+            $trade_code = $trade_code;
+        } else {
+            $trade_code = 'free_inner';
+        }
+        return self::$trade_code_list[$trade_code];
+    }
+
     public function getMinTTL()
     {
         $domainInfo = $this->getDomainInfo();
@@ -245,36 +287,5 @@ class huoshan implements DnsInterface
             return ['id' => $data['ZID'], 'name' => $data['ZoneName']];
         }
         return false;
-    }
-
-    private function convertType($type)
-    {
-        return $type;
-    }
-
-    private function getTradeInfo($trade_code)
-    {
-        if (array_key_exists($trade_code, self::$trade_code_list)) {
-            $trade_code = $trade_code;
-        } else {
-            $trade_code = 'free_inner';
-        }
-        return self::$trade_code_list[$trade_code];
-    }
-
-    private function send_request($method, $action, $params = [])
-    {
-        try{
-            return $this->client->request($method, $action, $params);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

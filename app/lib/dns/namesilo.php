@@ -41,7 +41,7 @@ class namesilo implements DnsInterface
         $data = $this->send_reuqest('listDomains', $param);
         if ($data) {
             $list = [];
-            if($data['domains']){
+            if ($data['domains']) {
                 foreach ($data['domains'] as $row) {
                     $list[] = [
                         'DomainId' => $row['domain'],
@@ -56,6 +56,60 @@ class namesilo implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_reuqest($operation, $param = null)
+    {
+        $url = $this->baseUrl . $operation;
+
+        $params = [
+            'version' => $this->version,
+            'type' => 'json',
+            'key' => $this->apikey,
+        ];
+        if ($param) {
+            $params = array_merge($params, $param);
+        }
+
+        $url .= '?' . http_build_query($params);
+
+        try {
+            $response = http_request($url, null, null, null, null, $this->proxy);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+
+        $arr = json_decode($response['body'], true);
+        if (isset($arr['reply']['code'])) {
+            if ($arr['reply']['code'] == 300) {
+                return $arr['reply'];
+            } else {
+                $this->setError(isset($arr['reply']['detail']) ? $arr['reply']['detail'] : '未知错误');
+                return false;
+            }
+        } else {
+            $this->setError($response['body']);
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['domain' => $this->domain];
@@ -78,23 +132,23 @@ class namesilo implements DnsInterface
                     'UpdateTime' => null,
                 ];
             }
-            if(!isNullOrEmpty($SubDomain)){
-                $list = array_values(array_filter($list, function($v) use ($SubDomain){
+            if (!isNullOrEmpty($SubDomain)) {
+                $list = array_values(array_filter($list, function ($v) use ($SubDomain) {
                     return strcasecmp($v['Name'], $SubDomain) === 0;
                 }));
-            }else{
-                if(!isNullOrEmpty($KeyWord)){
-                    $list = array_values(array_filter($list, function($v) use ($KeyWord){
+            } else {
+                if (!isNullOrEmpty($KeyWord)) {
+                    $list = array_values(array_filter($list, function ($v) use ($KeyWord) {
                         return strpos($v['Name'], $KeyWord) !== false || strpos($v['Value'], $KeyWord) !== false;
                     }));
                 }
-                if(!isNullOrEmpty($Value)){
-                    $list = array_values(array_filter($list, function($v) use ($Value){
+                if (!isNullOrEmpty($Value)) {
+                    $list = array_values(array_filter($list, function ($v) use ($Value) {
                         return $v['Value'] == $Value;
                     }));
                 }
-                if(!isNullOrEmpty($Type)){
-                    $list = array_values(array_filter($list, function($v) use ($Type){
+                if (!isNullOrEmpty($Type)) {
+                    $list = array_values(array_filter($list, function ($v) use ($Type) {
                         return $v['Type'] == $Type;
                     }));
                 }
@@ -104,19 +158,15 @@ class namesilo implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         if ($Name == '@') $Name = '';
@@ -126,7 +176,8 @@ class namesilo implements DnsInterface
         return is_array($data) ? $data['record_id'] : false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         if ($Name == '@') $Name = '';
@@ -136,13 +187,15 @@ class namesilo implements DnsInterface
         return is_array($data);
     }
 
-    //修改解析记录备注
+    //设置解析记录状态
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析记录操作日志
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['domain' => $this->domain, 'rrid' => $RecordId];
@@ -150,31 +203,32 @@ class namesilo implements DnsInterface
         return is_array($data);
     }
 
-    //设置解析记录状态
+    //获取解析线路列表
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         return false;
     }
 
-    //获取解析记录操作日志
+    //获取域名信息
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
+    //获取域名最低TTL
+
     public function getRecordLine()
     {
         return ['default' => ['name' => '默认', 'parent' => null]];
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -183,47 +237,5 @@ class namesilo implements DnsInterface
     public function addDomain($Domain)
     {
         return false;
-    }
-
-    private function send_reuqest($operation, $param = null)
-    {
-        $url = $this->baseUrl . $operation;
-
-        $params = [
-            'version' => $this->version,
-            'type' => 'json',
-            'key' => $this->apikey,
-        ];
-        if($param){
-            $params = array_merge($params, $param);
-        }
-
-        $url .= '?' . http_build_query($params);
-
-        try{
-            $response = http_request($url, null, null, null, null, $this->proxy);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-
-        $arr = json_decode($response['body'], true);
-        if (isset($arr['reply']['code'])) {
-            if ($arr['reply']['code'] == 300) {
-                return $arr['reply'];
-            } else {
-                $this->setError(isset($arr['reply']['detail']) ? $arr['reply']['detail'] : '未知错误');
-                return false;
-            }
-        } else {
-            $this->setError($response['body']);
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

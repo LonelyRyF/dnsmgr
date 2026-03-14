@@ -2,9 +2,9 @@
 
 namespace app\service;
 
+use app\lib\DnsHelper;
 use Exception;
 use think\facade\Db;
-use app\lib\DnsHelper;
 
 /**
  * 域名定时切换解析
@@ -68,13 +68,19 @@ class ScheduleService
             }
             $res = $dns->updateDomainRecord($row['recordid'], $row['rr'], getDnsType($row['value']), $row['value'], $recordinfo['Line'], $recordinfo['TTL']);
             if ($res) {
-                $this->add_log($domain, '修改解析', $row['rr'].' ['.getDnsType($row['value']).'] '.$row['value'].' (线路:'.$recordinfo['Line'].' TTL:'.$recordinfo['TTL'].')');
+                $this->add_log($domain, '修改解析', $row['rr'] . ' [' . getDnsType($row['value']) . '] ' . $row['value'] . ' (线路:' . $recordinfo['Line'] . ' TTL:' . $recordinfo['TTL'] . ')');
             } else {
                 $this->add_log($domain, '修改解析失败', $dns->getError());
             }
         }
 
         $this->update_nexttime($row);
+    }
+
+    private function add_log($domain, $action, $data)
+    {
+        if (strlen($data) > 500) $data = substr($data, 0, 500);
+        Db::name('log')->insert(['uid' => 0, 'domain' => $domain, 'action' => $action, 'data' => $data, 'addtime' => date("Y-m-d H:i:s")]);
     }
 
     public function update_nexttime($row)
@@ -108,11 +114,5 @@ class ScheduleService
             }
         }
         Db::name('sctask')->where('id', $row['id'])->update(['nexttime' => $nexttime]);
-    }
-
-    private function add_log($domain, $action, $data)
-    {
-        if (strlen($data) > 500) $data = substr($data, 0, 500);
-        Db::name('log')->insert(['uid' => 0, 'domain' => $domain, 'action' => $action, 'data' => $data, 'addtime' => date("Y-m-d H:i:s")]);
     }
 }

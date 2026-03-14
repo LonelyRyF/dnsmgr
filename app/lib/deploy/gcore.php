@@ -24,21 +24,6 @@ class gcore implements DeployInterface
         $this->request('/iam/clients/me');
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        $id = $config['id'];
-        if (empty($id)) throw new Exception('证书ID不能为空');
-
-        $params = [
-            'name' => $config['name'],
-            'sslCertificate' => $fullchain,
-            'sslPrivateKey' => $privatekey,
-            'validate_root_ca' => true,
-        ];
-        $this->request('/cdn/sslData/' . $id, $params, 'PUT');
-        $this->log('证书ID:' . $id . '更新成功！');
-    }
-
     private function request($path, $params = null, $method = null)
     {
         $url = $this->url . $path;
@@ -63,15 +48,30 @@ class gcore implements DeployInterface
         }
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function deploy($fullchain, $privatekey, $config, &$info)
+    {
+        $id = $config['id'];
+        if (empty($id)) throw new Exception('证书ID不能为空');
+
+        $params = [
+            'name' => $config['name'],
+            'sslCertificate' => $fullchain,
+            'sslPrivateKey' => $privatekey,
+            'validate_root_ca' => true,
+        ];
+        $this->request('/cdn/sslData/' . $id, $params, 'PUT');
+        $this->log('证书ID:' . $id . '更新成功！');
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

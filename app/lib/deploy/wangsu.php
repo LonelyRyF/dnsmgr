@@ -28,6 +28,67 @@ class wangsu implements DeployInterface
         return true;
     }
 
+    private function request($path, $data = null, $json = false, $date = null, $method = null, $getLocation = false, $headers = [])
+    {
+        $body = null;
+        if ($data) {
+            $body = $json ? json_encode($data) : http_build_query($data);
+        }
+
+        if (empty($date)) {
+            $date = gmdate("D, d M Y H:i:s T");
+        }
+
+        $hmac = hash_hmac('sha1', $date, $this->apiKey, true);
+        $signature = base64_encode($hmac);
+        $authorization = 'Basic ' . base64_encode($this->username . ':' . $signature);
+
+        if (empty($headers)) {
+            $headers = [
+                'Authorization' => $authorization,
+                'Date' => $date,
+                'Accept' => 'application/json',
+                'Connection' => 'close',
+            ];
+        } else {
+            $headers['Authorization'] = $authorization;
+            $headers['Date'] = $date;
+            $headers['Accept'] = 'application/json';
+            $headers['Connection'] = 'close';
+        }
+
+        if ($body && $json) {
+            $headers['Content-Type'] = 'application/json';
+        }
+
+        $url = 'https://open.chinanetcenter.com' . $path;
+        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method, 30);
+        $result = json_decode($response['body'], true);
+
+        if ((isset($response['code']) && $response['code'] == 201) || (isset($response['code']) && $response['code'] == 200 && $getLocation === true)) {
+            if (isset($response['headers']['Location'])) {
+                $location = trim(array_shift($response['headers']['Location'])); // 提取 Location 头部的值并去除多余空格
+                if (!empty($location)) {
+                    return $location;
+                }
+            }
+            // 如果没有找到 Location 头部，返回默认值 true
+            return true;
+
+        } elseif (isset($response['code']) && $response['code'] >= 200 && $response['code'] <= 299) {
+            return isset($result) ? $result : true;
+
+        } elseif (isset($result['message'])) {
+            throw new Exception($result['message']);
+
+        } elseif (isset($result['result'])) {
+            throw new Exception($result['result']);
+
+        } else {
+            throw new Exception('请求失败');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if ($config['product'] == 'cdnpro') {
@@ -47,39 +108,6 @@ class wangsu implements DeployInterface
         } else {
             throw new Exception('未知的产品类型');
         }
-    }
-
-    public function deploy_cdn($fullchain, $privatekey, $config, &$info)
-    {
-        if (empty($config['domains'])) {
-            throw new Exception('绑定的域名不能为空');
-        }
-        $domains = explode(',', $config['domains']);
-
-        $certInfo = openssl_x509_parse($fullchain, true);
-        if (!$certInfo) {
-            throw new Exception('证书解析失败');
-        }
-
-        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
-        $serial_no = strtolower($certInfo['serialNumberHex']);
-        $this->log('证书序列号：' . $serial_no);
-        $cert_id = isset($info['cert_id']) ? $info['cert_id'] : null;
-        $cert_id = $this->get_cert_id($fullchain, $privatekey, $cert_name, $cert_id, $serial_no, false);
-
-        $param = [
-            'certificateId' => $cert_id,
-            'domainNames' => $domains
-        ];
-
-        try {
-            $data = $this->request('/api/config/certificate/batch', $param, true, null, 'PUT');
-        } catch (Exception $e) {
-            throw new Exception('绑定域名失败：' . $e->getMessage());
-        }
-
-        $this->log('绑定证书成功，证书ID：' . $cert_id);
-        $info['cert_id'] = $cert_id;
     }
 
     public function deploy_cdnpro($fullchain, $privatekey, $config, &$info)
@@ -213,6 +241,143 @@ class wangsu implements DeployInterface
         $info['cert_id'] = $cert_id;
     }
 
+    private function get_cert_id_cdnpro($fullchain, $privatekey, $cert_name)
+    {
+        $cert_id = null;
+
+        try {
+            $data = $this->request('/cdn/certificates?search=' . urlencode($cert_name));
+        } catch (Exception $e) {
+            throw new Exception('获取证书列表失败：' . $e->getMessage());
+        }
+
+        if ($data['count'] > 0) {
+            foreach ($data['certificates'] as $cert) {
+                if ($cert_name == $cert['name']) {
+                    $cert_id = $cert['certificateId'];
+                    $this->log('证书' . $cert_name . '已存在，证书ID：' . $cert_id);
+                    return $cert_id;
+                }
+            }
+        }
+
+        $date = gmdate("D, d M Y H:i:s T");
+        $encryptedKey = $this->encryptPrivateKey($privatekey, $date);
+        $param = [
+            'name' => $cert_name,
+            'autoRenew' => 'Off',
+            'newVersion' => [
+                'privateKey' => $encryptedKey,
+                'certificate' => $fullchain,
+            ]
+        ];
+
+        try {
+            $data = $this->request('/cdn/certificates', $param, true, $date);
+        } catch (Exception $e) {
+            throw new Exception('上传证书失败：' . $e->getMessage());
+        }
+
+        $url_parts = parse_url($data);
+        $path_parts = explode('/', $url_parts['path']);
+        $cert_id = end($path_parts);
+        $this->log('上传证书成功，证书ID：' . $cert_id);
+
+        usleep(500000);
+
+        return $cert_id;
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
+    private function encryptPrivateKey($privateKey, $date = null)
+    {
+        // 获取当前 GMT 时间（DATE）
+        if (empty($date)) {
+            $date = gmdate("D, d M Y H:i:s T");
+        }
+
+        // 生成 HMAC-SHA256 密钥材料
+        if (!empty($this->spKey)) {
+            $apiKey = $this->spKey;
+        } else {
+            $apiKey = $this->apiKey;
+        }
+        $hmac = hash_hmac('sha256', $date, $apiKey, true);
+        $aesIvKeyHex = bin2hex($hmac);
+
+        if (strlen($aesIvKeyHex) != 64) {
+            throw new Exception("Invalid HMAC length: " . strlen($aesIvKeyHex));
+        }
+
+        // 提取 IV 和 Key
+        $ivHex = substr($aesIvKeyHex, 0, 32);
+        $keyHex = substr($aesIvKeyHex, 32, 64);
+
+        $iv = hex2bin($ivHex);
+        $key = hex2bin($keyHex);
+
+        $blockSize = 16; // AES 块大小为 16 字节
+        $plainLen = strlen($privateKey);
+        $padLen = $blockSize - ($plainLen % $blockSize);
+        $padding = str_repeat(chr($padLen), $padLen);
+        $plainText = $privateKey . $padding;
+
+        // AES-128-CBC 加密
+        $encrypted = openssl_encrypt(
+            $plainText,
+            'AES-128-CBC',
+            $key,
+            OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING,
+            $iv
+        );
+
+        if ($encrypted === false) {
+            throw new Exception("Encryption failed: " . openssl_error_string());
+        }
+
+        // 返回 Base64 编码结果
+        return base64_encode($encrypted);
+    }
+
+    public function deploy_cdn($fullchain, $privatekey, $config, &$info)
+    {
+        if (empty($config['domains'])) {
+            throw new Exception('绑定的域名不能为空');
+        }
+        $domains = explode(',', $config['domains']);
+
+        $certInfo = openssl_x509_parse($fullchain, true);
+        if (!$certInfo) {
+            throw new Exception('证书解析失败');
+        }
+
+        $cert_name = str_replace('*.', '', $certInfo['subject']['CN']) . '-' . $certInfo['validFrom_time_t'];
+        $serial_no = strtolower($certInfo['serialNumberHex']);
+        $this->log('证书序列号：' . $serial_no);
+        $cert_id = isset($info['cert_id']) ? $info['cert_id'] : null;
+        $cert_id = $this->get_cert_id($fullchain, $privatekey, $cert_name, $cert_id, $serial_no, false);
+
+        $param = [
+            'certificateId' => $cert_id,
+            'domainNames' => $domains
+        ];
+
+        try {
+            $data = $this->request('/api/config/certificate/batch', $param, true, null, 'PUT');
+        } catch (Exception $e) {
+            throw new Exception('绑定域名失败：' . $e->getMessage());
+        }
+
+        $this->log('绑定证书成功，证书ID：' . $cert_id);
+        $info['cert_id'] = $cert_id;
+    }
+
     private function get_cert_id($fullchain, $privatekey, $cert_name, $cert_id = null, $serial_no = null, $overwrite = false)
     {
         if ($cert_id) {
@@ -302,173 +467,8 @@ class wangsu implements DeployInterface
         return $cert_id;
     }
 
-    private function get_cert_id_cdnpro($fullchain, $privatekey, $cert_name)
-    {
-        $cert_id = null;
-
-        try {
-            $data = $this->request('/cdn/certificates?search=' . urlencode($cert_name));
-        } catch (Exception $e) {
-            throw new Exception('获取证书列表失败：' . $e->getMessage());
-        }
-
-        if ($data['count'] > 0) {
-            foreach ($data['certificates'] as $cert) {
-                if ($cert_name == $cert['name']) {
-                    $cert_id = $cert['certificateId'];
-                    $this->log('证书' . $cert_name . '已存在，证书ID：' . $cert_id);
-                    return $cert_id;
-                }
-            }
-        }
-
-        $date = gmdate("D, d M Y H:i:s T");
-        $encryptedKey = $this->encryptPrivateKey($privatekey, $date);
-        $param = [
-            'name' => $cert_name,
-            'autoRenew' => 'Off',
-            'newVersion' => [
-                'privateKey' => $encryptedKey,
-                'certificate' => $fullchain,
-            ]
-        ];
-
-        try {
-            $data = $this->request('/cdn/certificates', $param, true, $date);
-        } catch (Exception $e) {
-            throw new Exception('上传证书失败：' . $e->getMessage());
-        }
-
-        $url_parts = parse_url($data);
-        $path_parts = explode('/', $url_parts['path']);
-        $cert_id = end($path_parts);
-        $this->log('上传证书成功，证书ID：' . $cert_id);
-
-        usleep(500000);
-
-        return $cert_id;
-    }
-
-    private function encryptPrivateKey($privateKey, $date = null)
-    {
-        // 获取当前 GMT 时间（DATE）
-        if (empty($date)) {
-            $date = gmdate("D, d M Y H:i:s T");
-        }
-
-        // 生成 HMAC-SHA256 密钥材料
-        if (!empty($this->spKey)) {
-            $apiKey = $this->spKey;
-        } else {
-            $apiKey = $this->apiKey;
-        }
-        $hmac = hash_hmac('sha256', $date, $apiKey, true);
-        $aesIvKeyHex = bin2hex($hmac);
-
-        if (strlen($aesIvKeyHex) != 64) {
-            throw new Exception("Invalid HMAC length: " . strlen($aesIvKeyHex));
-        }
-        
-        // 提取 IV 和 Key
-        $ivHex = substr($aesIvKeyHex, 0, 32);
-        $keyHex = substr($aesIvKeyHex, 32, 64);
-
-        $iv = hex2bin($ivHex);
-        $key = hex2bin($keyHex);
-
-        $blockSize = 16; // AES 块大小为 16 字节
-        $plainLen = strlen($privateKey);
-        $padLen = $blockSize - ($plainLen % $blockSize);
-        $padding = str_repeat(chr($padLen), $padLen);
-        $plainText = $privateKey . $padding;
-
-        // AES-128-CBC 加密
-        $encrypted = openssl_encrypt(
-            $plainText,
-            'AES-128-CBC',
-            $key,
-            OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING,
-            $iv
-        );
-
-        if ($encrypted === false) {
-            throw new Exception("Encryption failed: " . openssl_error_string());
-        }
-        
-        // 返回 Base64 编码结果
-        return base64_encode($encrypted);
-    }
-
-    private function request($path, $data = null, $json = false, $date = null, $method = null, $getLocation = false, $headers = [])
-    {
-        $body = null;
-        if ($data) {
-            $body = $json ? json_encode($data) : http_build_query($data);
-        }
-
-        if (empty($date)) {
-            $date = gmdate("D, d M Y H:i:s T");
-        }
-
-        $hmac = hash_hmac('sha1', $date, $this->apiKey, true);
-        $signature = base64_encode($hmac);
-        $authorization = 'Basic ' . base64_encode($this->username . ':' . $signature);
-
-        if (empty($headers)) {
-            $headers = [
-                'Authorization' => $authorization,
-                'Date' => $date,
-                'Accept' => 'application/json',
-                'Connection' => 'close',
-            ];
-        } else {
-            $headers['Authorization'] = $authorization;
-            $headers['Date'] = $date;
-            $headers['Accept'] = 'application/json';
-            $headers['Connection'] = 'close';
-        }
-
-        if ($body && $json) {
-            $headers['Content-Type'] = 'application/json';
-        }
-
-        $url = 'https://open.chinanetcenter.com' . $path;
-        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method, 30);
-        $result = json_decode($response['body'], true);
-
-        if ((isset($response['code']) && $response['code'] == 201) || (isset($response['code']) && $response['code'] == 200 && $getLocation === true)) {
-            if (isset($response['headers']['Location'])) {
-                $location = trim(array_shift($response['headers']['Location'])); // 提取 Location 头部的值并去除多余空格
-                if (!empty($location)) {
-                    return $location;
-                }
-            }
-            // 如果没有找到 Location 头部，返回默认值 true
-            return true;
-
-        } elseif (isset($response['code']) && $response['code'] >= 200 && $response['code'] <= 299) {
-            return isset($result) ? $result : true;
-
-        } elseif (isset($result['message'])) {
-            throw new Exception($result['message']);
-
-        } elseif (isset($result['result'])) {
-            throw new Exception($result['result']);
-
-        } else {
-            throw new Exception('请求失败');
-        }
-    }
-
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

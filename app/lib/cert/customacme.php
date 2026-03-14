@@ -2,8 +2,8 @@
 
 namespace app\lib\cert;
 
-use app\lib\CertInterface;
 use app\lib\acme\ACMECert;
+use app\lib\CertInterface;
 use Exception;
 
 class customacme implements CertInterface
@@ -47,7 +47,9 @@ class customacme implements CertInterface
         return ['kid' => $kid, 'key' => $key];
     }
 
-    public function buyCert($domainList, &$order) {}
+    public function buyCert($domainList, &$order)
+    {
+    }
 
     public function createOrder($domainList, &$order, $keytype, $keysize)
     {
@@ -64,7 +66,7 @@ class customacme implements CertInterface
         if (!empty($order['challenges'])) {
             $keys = [];
             foreach ($order['challenges'] as $opts) {
-                $key = $opts['key'] . '|' .$opts['value'];
+                $key = $opts['key'] . '|' . $opts['value'];
                 if (in_array($key, $keys)) continue;
                 $mainDomain = getMainDomain($opts['domain']);
                 $name = substr($opts['key'], 0, -(strlen($mainDomain) + 1));
@@ -109,7 +111,9 @@ class customacme implements CertInterface
         $this->ac->revoke($pem);
     }
 
-    public function cancel($order) {}
+    public function cancel($order)
+    {
+    }
 
     public function setLogger($func)
     {

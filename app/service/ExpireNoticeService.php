@@ -2,27 +2,15 @@
 
 namespace app\service;
 
+use app\utils\MsgNotice;
 use Exception;
 use think\facade\Db;
-use app\utils\MsgNotice;
 
 /**
  * 域名到期提醒
  */
 class ExpireNoticeService
 {
-
-    public function updateDomainDate($id, $domain)
-    {
-        try {
-            [$regTime, $expireTime] = getDomainDate($domain);
-            Db::name('domain')->where('id', $id)->update(['regtime' => $regTime, 'expiretime' => $expireTime, 'checktime' => date('Y-m-d H:i:s'), 'checkstatus' => 1]);
-            return ['code' => 0, 'regTime' => $regTime, 'expireTime' => $expireTime, 'msg' => 'Success'];
-        } catch (Exception $e) {
-            Db::name('domain')->where('id', $id)->update(['checktime' => date('Y-m-d H:i:s'), 'checkstatus' => 2]);
-            return ['code' => -1, 'msg' => $e->getMessage()];
-        }
-    }
 
     public function task()
     {
@@ -62,6 +50,18 @@ class ExpireNoticeService
             sleep(1);
         }
         return $count;
+    }
+
+    public function updateDomainDate($id, $domain)
+    {
+        try {
+            [$regTime, $expireTime] = getDomainDate($domain);
+            Db::name('domain')->where('id', $id)->update(['regtime' => $regTime, 'expiretime' => $expireTime, 'checktime' => date('Y-m-d H:i:s'), 'checkstatus' => 1]);
+            return ['code' => 0, 'regTime' => $regTime, 'expireTime' => $expireTime, 'msg' => 'Success'];
+        } catch (Exception $e) {
+            Db::name('domain')->where('id', $id)->update(['checktime' => date('Y-m-d H:i:s'), 'checkstatus' => 2]);
+            return ['code' => -1, 'msg' => $e->getMessage()];
+        }
     }
 
     private function refreshExpiringDomainList($max_day)

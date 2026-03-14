@@ -33,10 +33,14 @@ class BaiduCloud
     public function request($method, $path, $query = null, $params = null)
     {
         if (!empty($query)) {
-            $query = array_filter($query, function ($a) { return $a !== null;});
+            $query = array_filter($query, function ($a) {
+                return $a !== null;
+            });
         }
         if (!empty($params)) {
-            $params = array_filter($params, function ($a) { return $a !== null;});
+            $params = array_filter($params, function ($a) {
+                return $a !== null;
+            });
         }
 
         $time = time();
@@ -53,13 +57,13 @@ class BaiduCloud
         $authorization = $this->generateSign($method, $path, $query, $headers, $time);
         $headers['Authorization'] = $authorization;
 
-        $url = 'https://'.$this->endpoint.$path;
+        $url = 'https://' . $this->endpoint . $path;
         if (!empty($query)) {
-            $url .= '?'.http_build_query($query);
+            $url .= '?' . http_build_query($query);
         }
         $header = [];
         foreach ($headers as $key => $value) {
-            $header[] = $key.': '.$value;
+            $header[] = $key . ': ' . $value;
         }
         return $this->curl($method, $url, $body, $header);
     }
@@ -73,10 +77,10 @@ class BaiduCloud
         $canonicalUri = $this->getCanonicalUri($path);
         $canonicalQueryString = $this->getCanonicalQueryString($query);
         [$canonicalHeaders, $signedHeaders] = $this->getCanonicalHeaders($headers);
-        $canonicalRequest = $httpRequestMethod."\n"
-            .$canonicalUri."\n"
-            .$canonicalQueryString."\n"
-            .$canonicalHeaders;
+        $canonicalRequest = $httpRequestMethod . "\n"
+            . $canonicalUri . "\n"
+            . $canonicalQueryString . "\n"
+            . $canonicalHeaders;
 
         // step 2: calculate signing key
         $date = gmdate("Y-m-d\TH:i:s\Z", $time);
@@ -93,19 +97,19 @@ class BaiduCloud
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalUri($path)
     {
         if (empty($path)) return '/';
         $uri = str_replace('%2F', '/', $this->escape($path));
         if (substr($uri, 0, 1) !== '/') $uri = '/' . $uri;
         return $uri;
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalQueryString($parameters)

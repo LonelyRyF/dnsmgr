@@ -29,7 +29,7 @@ class AuthApi
         if ($user['is_api'] == 0) {
             return json(['code' => -1, 'msg' => '该用户未开启API权限'])->code(403);
         }
-        if (md5($uid.$timestamp.$user['apikey']) !== $sign) {
+        if (md5($uid . $timestamp . $user['apikey']) !== $sign) {
             return json(['code' => -1, 'msg' => '签名错误'])->code(403);
         }
 

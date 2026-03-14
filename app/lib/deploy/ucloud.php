@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\Ucloud as UcloudClient;
+use app\lib\DeployInterface;
 use Exception;
 
 class ucloud implements DeployInterface
@@ -104,15 +104,15 @@ class ucloud implements DeployInterface
         $info['cert_name'] = $cert_name;
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
             call_user_func($this->logger, $txt);
         }
+    }
+
+    public function setLogger($func)
+    {
+        $this->logger = $func;
     }
 }

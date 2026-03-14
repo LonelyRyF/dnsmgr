@@ -32,6 +32,30 @@ class kuocai implements DeployInterface
         ]);
     }
 
+    private function request($path, $params = null, $json = false)
+    {
+        $url = 'https://www.kuocaicdn.com' . $path;
+        $body = $json ? json_encode($params) : $params;
+        $headers = [];
+        if ($json) $headers['Content-Type'] = 'application/json';
+        $response = http_request(
+            $url,
+            $body,
+            null,
+            $this->token ? "kuocai_cdn_token={$this->token}" : null,
+            $headers,
+            $this->proxy
+        );
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 'SUCCESS') {
+            return isset($result['data']) ? $result['data'] : null;
+        } elseif (isset($result['message'])) {
+            throw new Exception($result['message']);
+        } else {
+            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $id = $config['id'];
@@ -56,11 +80,6 @@ class kuocai implements DeployInterface
         $this->log("域名ID:{$id}更新成功！");
     }
 
-    public function setLogger($func)
-    {
-        $this->logger = $func;
-    }
-
     private function log($txt)
     {
         if ($this->logger) {
@@ -68,27 +87,8 @@ class kuocai implements DeployInterface
         }
     }
 
-    private function request($path, $params = null, $json = false)
+    public function setLogger($func)
     {
-        $url = 'https://www.kuocaicdn.com' . $path;
-        $body = $json ? json_encode($params) : $params;
-        $headers = [];
-        if ($json) $headers['Content-Type'] = 'application/json';
-        $response = http_request(
-            $url,
-            $body,
-            null,
-            $this->token ? "kuocai_cdn_token={$this->token}" : null,
-            $headers,
-            $this->proxy
-        );
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 'SUCCESS') {
-            return isset($result['data']) ? $result['data'] : null;
-        } elseif (isset($result['message'])) {
-            throw new Exception($result['message']);
-        } else {
-            throw new Exception('请求失败(httpCode=' . $response['code'] . ')');
-        }
+        $this->logger = $func;
     }
 }

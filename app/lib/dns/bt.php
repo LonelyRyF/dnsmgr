@@ -63,6 +63,76 @@ class bt implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function execute($path, $params)
+    {
+        $method = 'POST';
+        $timestamp = (string)time();
+        $body = json_encode($params);
+        $signingString = implode("\n", [
+            $this->accountId,
+            $timestamp,
+            $method,
+            $path,
+            $body
+        ]);
+        $signature = hash_hmac('sha256', $signingString, $this->secretKey);
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-Account-ID' => $this->accountId,
+            'X-Access-Key' => $this->accessKey,
+            'X-Timestamp' => $timestamp,
+            'X-Signature' => $signature
+        ];
+        $response = $this->curl($method, $path, $headers, $body);
+        if (!$response) {
+            return false;
+        }
+        $arr = json_decode($response, true);
+        if ($arr) {
+            if ($arr['code'] == 0) {
+                return $arr['data'];
+            } else {
+                $this->setError($arr['msg']);
+                return false;
+            }
+        } else {
+            $this->setError('返回数据解析失败');
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function curl($method, $path, $header, $body = null)
+    {
+        $url = $this->baseUrl . $path;
+        try {
+            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        return $response['body'];
+    }
+
+    //获取解析记录详细信息
+
+    private function setError($message)
+    {
+        $this->error = $message;
+    }
+
+    //添加解析记录
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //修改解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['domain_id' => $this->domainid, 'domain_type' => $this->domainType, 'p' => $PageNumber, 'rows' => $PageSize];
@@ -109,20 +179,15 @@ class bt implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录备注
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //删除解析记录
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['domain_id' => $this->domainid, 'domain_type' => $this->domainType, 'type' => $Type, 'record' => $Name, 'value' => $Value, 'ttl' => intval($TTL), 'view_id' => intval($Line), 'remark' => $Remark];
@@ -133,7 +198,8 @@ class bt implements DnsInterface
         return $data !== false;
     }
 
-    //修改解析记录
+    //设置解析记录状态
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['record_id' => $RecordId, 'domain_id' => $this->domainid, 'domain_type' => $this->domainType, 'type' => $Type, 'record' => $Name, 'value' => $Value, 'ttl' => intval($TTL), 'view_id' => intval($Line), 'remark' => $Remark];
@@ -144,13 +210,15 @@ class bt implements DnsInterface
         return $data !== false;
     }
 
-    //修改解析记录备注
+    //获取解析记录操作日志
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析线路列表
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['id' => $RecordId, 'domain_id' => $this->domainid, 'domain_type' => $this->domainType];
@@ -158,7 +226,6 @@ class bt implements DnsInterface
         return $data !== false;
     }
 
-    //设置解析记录状态
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $param = ['record_id' => $RecordId, 'domain_id' => $this->domainid, 'domain_type' => $this->domainType];
@@ -166,13 +233,15 @@ class bt implements DnsInterface
         return $data !== false;
     }
 
-    //获取解析记录操作日志
+    //获取域名信息
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
+    //获取域名最低TTL
+
     public function getRecordLine()
     {
         $param = [];
@@ -197,13 +266,11 @@ class bt implements DnsInterface
         }
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return 300;
@@ -217,60 +284,5 @@ class bt implements DnsInterface
             return ['id' => $data['domain_id'], 'name' => $data['full_domain']];
         }
         return false;
-    }
-
-    private function execute($path, $params)
-    {
-        $method = 'POST';
-        $timestamp = (string)time();
-        $body = json_encode($params);
-        $signingString = implode("\n", [
-            $this->accountId,
-            $timestamp,
-            $method,
-            $path,
-            $body
-        ]);
-        $signature = hash_hmac('sha256', $signingString, $this->secretKey);
-        $headers = [
-            'Content-Type' => 'application/json',
-            'X-Account-ID' => $this->accountId,
-            'X-Access-Key' => $this->accessKey,
-            'X-Timestamp' => $timestamp,
-            'X-Signature' => $signature
-        ];
-        $response = $this->curl($method, $path, $headers, $body);
-        if (!$response) {
-            return false;
-        }
-        $arr = json_decode($response, true);
-        if ($arr) {
-            if ($arr['code'] == 0) {
-                return $arr['data'];
-            } else {
-                $this->setError($arr['msg']);
-                return false;
-            }
-        } else {
-            $this->setError('返回数据解析失败');
-            return false;
-        }
-    }
-
-    private function curl($method, $path, $header, $body = null)
-    {
-        $url = $this->baseUrl . $path;
-        try {
-            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
-        } catch (\Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-        return $response['body'];
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
     }
 }

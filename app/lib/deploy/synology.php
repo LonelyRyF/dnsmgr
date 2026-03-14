@@ -99,6 +99,13 @@ class synology implements DeployInterface
         }
     }
 
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     private function import($fullchain, $privatekey, $config, $id = null)
     {
         $url = $this->url . '/webapi/entry.cgi';
@@ -156,12 +163,5 @@ class synology implements DeployInterface
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

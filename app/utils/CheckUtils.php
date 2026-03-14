@@ -50,7 +50,7 @@ class CheckUtils
         if ($proxy) {
             $proxy_server = config_get('proxy_server');
             $proxy_port = intval(config_get('proxy_port'));
-            $proxy_userpwd = config_get('proxy_user').':'.config_get('proxy_pwd');
+            $proxy_userpwd = config_get('proxy_user') . ':' . config_get('proxy_pwd');
             $proxy_type = config_get('proxy_type');
 
             if (!empty($proxy_server) && !empty($proxy_port)) {
@@ -98,7 +98,7 @@ class CheckUtils
             if (!$target) return ['status' => false, 'errmsg' => 'DNS resolve failed', 'usetime' => 0];
         }
         if (filter_var($target, FILTER_VALIDATE_IP) && str_contains($target, ':')) {
-            $target = '['.$target.']';
+            $target = '[' . $target . ']';
         }
         $starttime = getMillisecond();
         $fp = @fsockopen($target, $port, $errCode, $errStr, $timeout);
@@ -127,9 +127,9 @@ class CheckUtils
         }
         $timeout = 1;
         if (str_contains($target, ':')) {
-            exec('ping -6 -c 1 -w '.$timeout.' '.$target, $output, $return_var);
+            exec('ping -6 -c 1 -w ' . $timeout . ' ' . $target, $output, $return_var);
         } else {
-            exec('ping -c 1 -w '.$timeout.' '.$target, $output, $return_var);
+            exec('ping -c 1 -w ' . $timeout . ' ' . $target, $output, $return_var);
         }
         if (!empty($output[1])) {
             if (strpos($output[1], '毫秒') !== false) {

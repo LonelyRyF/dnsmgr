@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\Aliyun as AliyunClient;
+use app\lib\DnsInterface;
 use Exception;
 
 class aliyun implements DnsInterface
@@ -60,6 +60,34 @@ class aliyun implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function request($param, $returnData = false)
+    {
+        if (empty($this->AccessKeyId) || empty($this->AccessKeySecret)) return false;
+        try {
+            $result = $this->client->request($param);
+        } catch (Exception $e) {
+            try {
+                usleep(50000);
+                $result = $this->client->request($param);
+            } catch (Exception $e) {
+                $this->setError($e->getMessage());
+                return false;
+            }
+        }
+        return $returnData ? $result : true;
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['Action' => 'DescribeDomainRecords', 'DomainName' => $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize];
@@ -96,7 +124,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
+    //添加解析记录
+
     public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
     {
         $param = ['Action' => 'DescribeSubDomainRecords', 'SubDomain' => $SubDomain . '.' . $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize, 'Type' => $Type, 'Line' => $Line];
@@ -124,7 +153,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取解析记录详细信息
+    //修改解析记录
+
     public function getDomainRecordInfo($RecordId)
     {
         $param = ['Action' => 'DescribeDomainRecordInfo', 'RecordId' => $RecordId];
@@ -148,7 +178,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = null, $Weight = null, $Remark = null)
     {
         $param = ['Action' => 'AddDomainRecord', 'DomainName' => $this->domain, 'RR' => $Name, 'Type' => $Type, 'Value' => $Value, 'Line' => $this->convertLineCode($Line), 'TTL' => intval($TTL)];
@@ -162,7 +193,19 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //修改解析记录
+    //删除解析记录
+
+    private function convertLineCode($line)
+    {
+        $convert_dict = ['0' => 'default', '10=1' => 'unicom', '10=0' => 'telecom', '10=3' => 'mobile', '10=2' => 'edu', '3=0' => 'oversea', '10=22' => 'btvn', '80=0' => 'search', '7=0' => 'internal'];
+        if (array_key_exists($line, $convert_dict)) {
+            return $convert_dict[$line];
+        }
+        return $line;
+    }
+
+    //删除子域名的解析记录
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = 'default', $TTL = 600, $MX = null, $Weight = null, $Remark = null)
     {
         $param = ['Action' => 'UpdateDomainRecord', 'RecordId' => $RecordId, 'RR' => $Name, 'Type' => $Type, 'Value' => $Value, 'Line' => $this->convertLineCode($Line), 'TTL' => intval($TTL)];
@@ -172,28 +215,32 @@ class aliyun implements DnsInterface
         return $this->request($param);
     }
 
-    //修改解析记录备注
+    //设置解析记录状态
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         $param = ['Action' => 'UpdateDomainRecordRemark', 'RecordId' => $RecordId, 'Remark' => $Remark];
         return $this->request($param);
     }
 
-    //删除解析记录
+    //获取解析记录操作日志
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['Action' => 'DeleteDomainRecord', 'RecordId' => $RecordId];
         return $this->request($param);
     }
 
-    //删除子域名的解析记录
+    //获取解析线路列表
+
     public function deleteSubDomainRecords($SubDomain)
     {
         $param = ['Action' => 'DeleteSubDomainRecords', 'DomainName' => $this->domain, 'RR' => $SubDomain];
         return $this->request($param);
     }
 
-    //设置解析记录状态
+    //获取域名信息
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $Status = $Status == '1' ? 'Enable' : 'Disable';
@@ -201,7 +248,8 @@ class aliyun implements DnsInterface
         return $this->request($param);
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         $param = ['Action' => 'DescribeRecordLogs', 'DomainName' => $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize, 'KeyWord' => $KeyWord, 'StartDate' => $StartDate, 'endDate' => $endDate, 'Lang' => 'zh'];
@@ -216,7 +264,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取解析线路列表
+    //获取权重配置子域名列表
+
     public function getRecordLine()
     {
         $data = $this->getDomainInfo();
@@ -230,7 +279,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取域名信息
+    //开启关闭权重配置
+
     public function getDomainInfo()
     {
         if (!empty($this->domainInfo)) return $this->domainInfo;
@@ -243,7 +293,8 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取域名最低TTL
+    //修改权重
+
     public function getMinTTL()
     {
         $data = $this->getDomainInfo();
@@ -253,7 +304,6 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //获取权重配置子域名列表
     public function getWeightSubDomains($PageNumber = 1, $PageSize = 20, $SubDomain = null)
     {
         $param = ['Action' => 'DescribeDNSSLBSubDomains', 'DomainName' => $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize];
@@ -273,7 +323,6 @@ class aliyun implements DnsInterface
         return false;
     }
 
-    //开启关闭权重配置
     public function setWeightStatus($SubDomain, $Open, $Type = null, $Line = null)
     {
         $param = ['Action' => 'SetDNSSLBStatus', 'DomainName' => $this->domain, 'SubDomain' => $SubDomain, 'Open' => $Open == '1' ? 'true' : 'false'];
@@ -286,7 +335,6 @@ class aliyun implements DnsInterface
         return $this->request($param);
     }
 
-    //修改权重
     public function updateRecordWeight($RecordId, $Weight)
     {
         $param = ['Action' => 'UpdateDNSSLBWeight', 'RecordId' => $RecordId, 'Weight' => $Weight];
@@ -301,37 +349,5 @@ class aliyun implements DnsInterface
             return ['id' => $result['DomainId'], 'name' => $result['DomainName']];
         }
         return false;
-    }
-
-    private function convertLineCode($line)
-    {
-        $convert_dict = ['0' => 'default', '10=1' => 'unicom', '10=0' => 'telecom', '10=3' => 'mobile', '10=2' => 'edu', '3=0' => 'oversea', '10=22' => 'btvn', '80=0' => 'search', '7=0' => 'internal'];
-        if (array_key_exists($line, $convert_dict)) {
-            return $convert_dict[$line];
-        }
-        return $line;
-    }
-
-    private function request($param, $returnData = false)
-    {
-        if (empty($this->AccessKeyId) || empty($this->AccessKeySecret)) return false;
-        try {
-            $result = $this->client->request($param);
-        } catch (Exception $e) {
-            try {
-                usleep(50000);
-                $result = $this->client->request($param);
-            } catch (Exception $e) {
-                $this->setError($e->getMessage());
-                return false;
-            }
-        }
-        return $returnData ? $result : true;
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

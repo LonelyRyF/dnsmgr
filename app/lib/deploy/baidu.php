@@ -2,8 +2,8 @@
 
 namespace app\lib\deploy;
 
-use app\lib\DeployInterface;
 use app\lib\client\BaiduCloud;
+use app\lib\DeployInterface;
 use Exception;
 
 class baidu implements DeployInterface
@@ -80,34 +80,11 @@ class baidu implements DeployInterface
         }
     }
 
-    public function deploy_blb($cert_id, $config)
+    private function log($txt)
     {
-        if (empty($config['blb_id'])) throw new Exception('负载均衡实例ID不能为空');
-        if (empty($config['blb_port'])) throw new Exception('HTTPS监听端口不能为空');
-        $client = new BaiduCloud($this->AccessKeyId, $this->SecretAccessKey, 'blb.' . $config['region'] . '.baidubce.com', $this->proxy);
-        $query = [
-            'listenerPort' => $config['blb_port'],
-        ];
-        $param = [
-            'certIds' => [$cert_id],
-        ];
-        $client->request('PUT', '/v1/blb/' . $config['blb_id'] . '/HTTPSlistener', $query, $param);
-        $this->log('普通型BLB ' . $config['blb_id'] . ' 部署证书成功！');
-    }
-
-    public function deploy_appblb($cert_id, $config)
-    {
-        if (empty($config['blb_id'])) throw new Exception('负载均衡实例ID不能为空');
-        if (empty($config['blb_port'])) throw new Exception('HTTPS监听端口不能为空');
-        $client = new BaiduCloud($this->AccessKeyId, $this->SecretAccessKey, 'blb.' . $config['region'] . '.baidubce.com', $this->proxy);
-        $query = [
-            'listenerPort' => $config['blb_port'],
-        ];
-        $param = [
-            'certIds' => [$cert_id],
-        ];
-        $client->request('PUT', '/v1/appblb/' . $config['blb_id'] . '/HTTPSlistener', $query, $param);
-        $this->log('应用型BLB ' . $config['blb_id'] . ' 部署证书成功！');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
     }
 
     private function get_cert_id($fullchain, $privatekey)
@@ -147,15 +124,38 @@ class baidu implements DeployInterface
         return $cert_id;
     }
 
+    public function deploy_blb($cert_id, $config)
+    {
+        if (empty($config['blb_id'])) throw new Exception('负载均衡实例ID不能为空');
+        if (empty($config['blb_port'])) throw new Exception('HTTPS监听端口不能为空');
+        $client = new BaiduCloud($this->AccessKeyId, $this->SecretAccessKey, 'blb.' . $config['region'] . '.baidubce.com', $this->proxy);
+        $query = [
+            'listenerPort' => $config['blb_port'],
+        ];
+        $param = [
+            'certIds' => [$cert_id],
+        ];
+        $client->request('PUT', '/v1/blb/' . $config['blb_id'] . '/HTTPSlistener', $query, $param);
+        $this->log('普通型BLB ' . $config['blb_id'] . ' 部署证书成功！');
+    }
+
+    public function deploy_appblb($cert_id, $config)
+    {
+        if (empty($config['blb_id'])) throw new Exception('负载均衡实例ID不能为空');
+        if (empty($config['blb_port'])) throw new Exception('HTTPS监听端口不能为空');
+        $client = new BaiduCloud($this->AccessKeyId, $this->SecretAccessKey, 'blb.' . $config['region'] . '.baidubce.com', $this->proxy);
+        $query = [
+            'listenerPort' => $config['blb_port'],
+        ];
+        $param = [
+            'certIds' => [$cert_id],
+        ];
+        $client->request('PUT', '/v1/appblb/' . $config['blb_id'] . '/HTTPSlistener', $query, $param);
+        $this->log('应用型BLB ' . $config['blb_id'] . ' 部署证书成功！');
+    }
+
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

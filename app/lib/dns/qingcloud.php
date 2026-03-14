@@ -60,6 +60,85 @@ class qingcloud implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function execute($method, $path, $params = null)
+    {
+        $date = gmdate('D, d M Y H:i:s \G\M\T');
+        $string_to_sign = $method . "\n" . $date . "\n" . $path;
+        if ($method == 'GET' && $params) {
+            ksort($params);
+            $string_to_sign .= '?' . http_build_query($params);
+        }
+        $signature = base64_encode(hash_hmac('sha256', $string_to_sign, $this->secret_access_key, true));
+        $authorization = 'QC-HMAC-SHA256 ' . $this->access_key_id . ':' . $signature;
+        $header = [
+            'Authorization' => $authorization,
+            'Date' => $date,
+        ];
+        if ($method == 'POST' || $method == 'PUT' || $method == 'DELETE') {
+            $header['Content-Type'] = 'application/json; charset=utf-8';
+            $response = $this->curl($method, $path, $header, json_encode($params));
+        } else {
+            if ($params) {
+                $path .= '?' . http_build_query($params);
+            }
+            $response = $this->curl($method, $path, $header);
+        }
+        $arr = json_decode($response['body'], true);
+        if (isset($arr['code']) && $arr['code'] == 0 || isset($arr['domains']) || $method == 'DELETE' && $response['code'] == 204) {
+            return $arr;
+        } elseif (isset($arr['message'])) {
+            $this->setError($arr['message']);
+            return false;
+        } elseif (isset($arr['msg'])) {
+            $this->setError($arr['msg']);
+            return false;
+        } else {
+            $this->setError('返回数据解析失败');
+            return false;
+        }
+    }
+
+    private function curl($method, $path, $header, $body = null)
+    {
+        $url = $this->baseUrl . $path;
+        try {
+            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        return $response;
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        $SubDomain = $this->getHost($SubDomain);
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
+    private function getHost($Name)
+    {
+        if ($Name == '@' || $Name == '') $Name = '';
+        else $Name .= '.';
+        $Name .= $this->domain . '.';
+        return $Name;
+    }
+
+    //修改解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         if ($SubDomain) {
@@ -97,6 +176,8 @@ class qingcloud implements DnsInterface
         return false;
     }
 
+    //修改解析记录备注
+
     private function getHostRecords($SubDomain)
     {
         $param = ['zone_name' => $this->domainid, 'domain_name' => $SubDomain];
@@ -118,7 +199,7 @@ class qingcloud implements DnsInterface
                             $row['value'] = trim($row['value'], '"');
                         }
                         $list[] = [
-                            'RecordId' => $record['domain_record_id'].'_'.$row['record_value_id'],
+                            'RecordId' => $record['domain_record_id'] . '_' . $row['record_value_id'],
                             'Domain' => $record['domain_name'],
                             'Name' => $name,
                             'Type' => $record['rd_type'],
@@ -140,28 +221,23 @@ class qingcloud implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        $SubDomain = $this->getHost($SubDomain);
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //删除解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //设置解析记录状态
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $mode = input('post.mode', '1');
 
         if ($Type == 'MX') {
-            $Value = intval($MX).' '.$Value;
+            $Value = intval($MX) . ' ' . $Value;
         } elseif ($Type == 'TXT' && substr($Value, 0, 1) != '"') {
-            $Value = '"'.$Value.'"';
+            $Value = '"' . $Value . '"';
         }
 
         $values = [];
@@ -177,21 +253,22 @@ class qingcloud implements DnsInterface
         return is_array($data) ? $data['domain_record_id'] : false;
     }
 
-    //修改解析记录
+    //获取解析记录操作日志
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $mode = input('post.mode', '1');
 
         if ($Type == 'MX') {
-            $Value = intval($MX).' '.$Value;
+            $Value = intval($MX) . ' ' . $Value;
         } elseif ($Type == 'TXT' && substr($Value, 0, 1) != '"') {
-            $Value = '"'.$Value.'"';
+            $Value = '"' . $Value . '"';
         }
 
         $recordId = explode('_', $RecordId);
         $domain_record_id = $recordId[0];
         $record_value_id = $recordId[1];
-        $data = $this->execute('GET', '/v1/dr_id/'.$domain_record_id);
+        $data = $this->execute('GET', '/v1/dr_id/' . $domain_record_id);
         if (!$data) return false;
 
         if (($Type == 'A' || $Type == 'CNAME') && $mode == '3') $Weight = intval($Weight);
@@ -213,11 +290,12 @@ class qingcloud implements DnsInterface
         }
 
         $param = ['zone_name' => $this->domainid, 'domain_name' => $Name, 'view_id' => intval($Line), 'type' => $Type, 'ttl' => intval($TTL), 'record' => json_encode($record), 'mode' => intval($mode)];
-        $data = $this->execute('POST', '/v1/dr_id/'.$domain_record_id, $param);
+        $data = $this->execute('POST', '/v1/dr_id/' . $domain_record_id, $param);
         return $data !== false;
     }
 
-    //修改解析记录备注
+    //获取解析线路列表
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         $param = ['zone_name' => $this->domainid, 'domain_name' => $RecordId, 'description' => $Remark];
@@ -225,7 +303,8 @@ class qingcloud implements DnsInterface
         return $data !== false;
     }
 
-    //删除解析记录
+    //获取域名信息
+
     public function deleteDomainRecord($RecordId)
     {
         if (strpos($RecordId, $this->domainid) !== false) {
@@ -237,7 +316,7 @@ class qingcloud implements DnsInterface
         $recordId = explode('_', $RecordId);
         $domain_record_id = $recordId[0];
         $record_value_id = $recordId[1];
-        $data = $this->execute('GET', '/v1/dr_id/'.$domain_record_id);
+        $data = $this->execute('GET', '/v1/dr_id/' . $domain_record_id);
         if (!$data) return false;
 
         $record = [];
@@ -263,11 +342,12 @@ class qingcloud implements DnsInterface
         $name = substr($data['data']['domain_name'], 0, -(strlen($data['data']['zone_name']) + 1));
         if ($name == '') $name = '@';
         $param = ['zone_name' => $this->domainid, 'domain_name' => $name, 'view_id' => $data['data']['view_id'], 'type' => $data['data']['rd_type'], 'ttl' => $data['data']['ttl'], 'record' => json_encode($record), 'mode' => $data['data']['mode']];
-        $data = $this->execute('POST', '/v1/dr_id/'.$domain_record_id, $param);
+        $data = $this->execute('POST', '/v1/dr_id/' . $domain_record_id, $param);
         return $data !== false;
     }
 
-    //设置解析记录状态
+    //获取域名最低TTL
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $recordId = explode('_', $RecordId);
@@ -277,13 +357,11 @@ class qingcloud implements DnsInterface
         return $data !== false;
     }
 
-    //获取解析记录操作日志
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         $param = ['zone_name' => $this->domainid, 'type' => 'GET_FULL'];
@@ -299,13 +377,11 @@ class qingcloud implements DnsInterface
         return false;
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         return false;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return 60;
@@ -319,69 +395,5 @@ class qingcloud implements DnsInterface
             return ['id' => $data['zone_name'], 'name' => $Domain];
         }
         return false;
-    }
-
-    private function getHost($Name)
-    {
-        if ($Name == '@' || $Name == '') $Name = '';
-        else $Name .= '.';
-        $Name .= $this->domain . '.';
-        return $Name;
-    }
-
-    private function execute($method, $path, $params = null)
-    {
-        $date = gmdate('D, d M Y H:i:s \G\M\T');
-        $string_to_sign = $method."\n".$date."\n".$path;
-        if($method == 'GET' && $params){
-            ksort($params);
-            $string_to_sign .= '?'.http_build_query($params);
-        }
-        $signature = base64_encode(hash_hmac('sha256', $string_to_sign, $this->secret_access_key, true));
-        $authorization = 'QC-HMAC-SHA256 '.$this->access_key_id.':'.$signature;
-        $header = [
-            'Authorization' => $authorization,
-            'Date' => $date,
-        ];
-        if ($method == 'POST' || $method == 'PUT' || $method == 'DELETE') {
-            $header['Content-Type'] = 'application/json; charset=utf-8';
-            $response = $this->curl($method, $path, $header, json_encode($params));
-        } else {
-            if ($params) {
-                $path .= '?'.http_build_query($params);
-            }
-            $response = $this->curl($method, $path, $header);
-        }
-        $arr = json_decode($response['body'], true);
-        if (isset($arr['code']) && $arr['code'] == 0 || isset($arr['domains']) || $method == 'DELETE' && $response['code'] == 204) {
-            return $arr;
-        } elseif(isset($arr['message'])) {
-            $this->setError($arr['message']);
-            return false;
-        } elseif(isset($arr['msg'])) {
-            $this->setError($arr['msg']);
-            return false;
-        } else {
-            $this->setError('返回数据解析失败');
-            return false;
-        }
-    }
-
-    private function curl($method, $path, $header, $body = null)
-    {
-        $url = $this->baseUrl . $path;
-        try {
-            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
-        } catch (\Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-        return $response;
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

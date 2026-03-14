@@ -154,7 +154,7 @@ class CertHelper
                     'placeholder' => 'https://gts.rat.dev',
                     'required' => true,
                     'show' => 'proxy==2',
-	                'note' => '反向代理配置参考：
+                    'note' => '反向代理配置参考：
 					<pre>resolver 8.8.8.8 ipv6=off valid=300s;
 resolver_timeout 10s;
 
@@ -395,13 +395,6 @@ location / {
         return self::$cert_config;
     }
 
-    private static function getConfig($aid)
-    {
-        $account = Db::name('cert_account')->where('id', $aid)->find();
-        if (!$account) return false;
-        return $account;
-    }
-
     public static function getInputs($type, $config = null)
     {
         $config = $config ? json_decode($config, true) : [];
@@ -430,6 +423,13 @@ location / {
             return $model;
         }
         return false;
+    }
+
+    private static function getConfig($aid)
+    {
+        $account = Db::name('cert_account')->where('id', $aid)->find();
+        if (!$account) return false;
+        return $account;
     }
 
     /**

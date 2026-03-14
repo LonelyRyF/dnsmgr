@@ -2,8 +2,8 @@
 
 namespace app\lib\cert;
 
-use app\lib\CertInterface;
 use app\lib\acme\ACMECert;
+use app\lib\CertInterface;
 use Exception;
 
 class litessl implements CertInterface
@@ -61,7 +61,7 @@ class litessl implements CertInterface
         if (!empty($order['challenges'])) {
             $keys = [];
             foreach ($order['challenges'] as $opts) {
-                $key = $opts['key'] . '|' .$opts['value'];
+                $key = $opts['key'] . '|' . $opts['value'];
                 if (in_array($key, $keys)) continue;
                 $mainDomain = getMainDomain($opts['domain']);
                 $name = substr($opts['key'], 0, -(strlen($mainDomain) + 1));

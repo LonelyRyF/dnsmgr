@@ -113,13 +113,6 @@ class Jdcloud
         return $authorization;
     }
 
-    private function escape($str)
-    {
-        $search = ['+', '*', '%7E'];
-        $replace = ['%20', '%2A', '~'];
-        return str_replace($search, $replace, urlencode($str));
-    }
-
     private function getCanonicalQueryString($parameters)
     {
         if (empty($parameters)) return '';
@@ -129,6 +122,13 @@ class Jdcloud
             $canonicalQueryString .= '&' . $this->escape($key) . '=' . $this->escape($value);
         }
         return substr($canonicalQueryString, 1);
+    }
+
+    private function escape($str)
+    {
+        $search = ['+', '*', '%7E'];
+        $replace = ['%20', '%2A', '~'];
+        return str_replace($search, $replace, urlencode($str));
     }
 
     private function getCanonicalHeaders($oldheaders)

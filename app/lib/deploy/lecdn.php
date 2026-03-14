@@ -39,6 +39,47 @@ class lecdn implements DeployInterface
         }
     }
 
+    private function request($path, $params = null, $method = null)
+    {
+        $url = $this->url . $path;
+        $headers = [];
+        $body = null;
+        if ($this->accessToken) {
+            $headers['Authorization'] = 'Bearer ' . $this->accessToken;
+        } elseif ($this->auth == 1 && $this->apiKey) {
+            $headers['Authorization'] = $this->apiKey;
+        }
+        if ($params) {
+            $headers['Content-Type'] = 'application/json;charset=UTF-8';
+            $body = json_encode($params);
+        }
+        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 200) {
+            return $result['data'] ?? null;
+        } elseif (isset($result['message'])) {
+            throw new Exception($result['message']);
+        } else {
+            throw new Exception('返回数据解析失败');
+        }
+    }
+
+    private function login()
+    {
+        $path = '/prod-api/login';
+        $params = [
+            'email' => $this->email,
+            'username' => $this->email,
+            'password' => $this->password,
+        ];
+        $result = $this->request($path, $params);
+        if (isset($result['token'])) {
+            $this->accessToken = $result['token'];
+        } else {
+            throw new Exception('登录成功，获取access_token失败');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         if ($this->auth == 0) {
@@ -83,56 +124,15 @@ class lecdn implements DeployInterface
         $this->log("证书ID:{$id}更新成功！");
     }
 
-    private function login()
+    private function log($txt)
     {
-        $path = '/prod-api/login';
-        $params = [
-            'email' => $this->email,
-            'username' => $this->email,
-            'password' => $this->password,
-        ];
-        $result = $this->request($path, $params);
-        if (isset($result['token'])) {
-            $this->accessToken = $result['token'];
-        } else {
-            throw new Exception('登录成功，获取access_token失败');
-        }
-    }
-
-    private function request($path, $params = null, $method = null)
-    {
-        $url = $this->url . $path;
-        $headers = [];
-        $body = null;
-        if ($this->accessToken) {
-            $headers['Authorization'] = 'Bearer ' . $this->accessToken;
-        } elseif ($this->auth == 1 && $this->apiKey) {
-            $headers['Authorization'] = $this->apiKey;
-        }
-        if ($params) {
-            $headers['Content-Type'] = 'application/json;charset=UTF-8';
-            $body = json_encode($params);
-        }
-        $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        $result = json_decode($response['body'], true);
-        if (isset($result['code']) && $result['code'] == 200) {
-            return $result['data'] ?? null;
-        } elseif (isset($result['message'])) {
-            throw new Exception($result['message']);
-        } else {
-            throw new Exception('返回数据解析失败');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

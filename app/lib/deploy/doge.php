@@ -26,6 +26,29 @@ class doge implements DeployInterface
         return true;
     }
 
+    private function request($path, $data = null, $json = false)
+    {
+        $body = null;
+        if ($data) {
+            $body = $json ? json_encode($data) : http_build_query($data);
+        }
+        $signStr = $path . "\n" . $body;
+        $sign = hash_hmac('sha1', $signStr, $this->SecretKey);
+        $authorization = "TOKEN " . $this->AccessKey . ":" . $sign;
+        $headers = ['Authorization' => $authorization];
+        if ($body && $json) $headers['Content-Type'] = 'application/json';
+        $url = 'https://api.dogecloud.com' . $path;
+        $response = http_request($url, $body, null, null, $headers, $this->proxy);
+        $result = json_decode($response['body'], true);
+        if (isset($result['code']) && $result['code'] == 200) {
+            return $result['data'] ?? true;
+        } elseif (isset($result['msg'])) {
+            throw new Exception($result['msg']);
+        } else {
+            throw new Exception('请求失败');
+        }
+    }
+
     public function deploy($fullchain, $privatekey, $config, &$info)
     {
         $domains = $config['domain'];
@@ -87,38 +110,15 @@ class doge implements DeployInterface
         return $cert_id;
     }
 
-    private function request($path, $data = null, $json = false)
+    private function log($txt)
     {
-        $body = null;
-        if($data){
-            $body = $json ? json_encode($data) : http_build_query($data);
-        }
-        $signStr = $path . "\n" . $body;
-        $sign = hash_hmac('sha1', $signStr, $this->SecretKey);
-        $authorization = "TOKEN " . $this->AccessKey . ":" . $sign;
-        $headers = ['Authorization' => $authorization];
-        if($body && $json) $headers['Content-Type'] = 'application/json';
-        $url = 'https://api.dogecloud.com'.$path;
-        $response = http_request($url, $body, null, null, $headers, $this->proxy);
-        $result = json_decode($response['body'], true);
-        if(isset($result['code']) && $result['code'] == 200){
-            return $result['data'] ?? true;
-        }elseif(isset($result['msg'])){
-            throw new Exception($result['msg']);
-        }else{
-            throw new Exception('请求失败');
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
         }
     }
 
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

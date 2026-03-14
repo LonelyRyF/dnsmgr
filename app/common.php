@@ -1,9 +1,9 @@
 <?php
 // 应用公共文件
-use think\facade\Db;
-use think\facade\Request;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use think\facade\Db;
+use think\facade\Request;
 
 function get_curl($url, $post = 0, $referer = 0, $cookie = 0, $ua = 0, $nobody = 0, $addheader = [])
 {
@@ -105,9 +105,9 @@ function authcode($string, $operation = 'DECODE', $key = '', $expiry = 0)
     $keya = md5(substr($key, 0, 16));
     $keyb = md5(substr($key, 16, 16));
     $keyc = $ckey_length ? ($operation == 'DECODE' ? substr($string, 0, $ckey_length) : substr(md5(microtime()), -$ckey_length)) : '';
-    $cryptkey = $keya.md5($keya.$keyc);
+    $cryptkey = $keya . md5($keya . $keyc);
     $key_length = strlen($cryptkey);
-    $string = $operation == 'DECODE' ? base64_decode(substr($string, $ckey_length)) : sprintf('%010d', $expiry ? $expiry + time() : 0).substr(md5($string.$keyb), 0, 16).$string;
+    $string = $operation == 'DECODE' ? base64_decode(substr($string, $ckey_length)) : sprintf('%010d', $expiry ? $expiry + time() : 0) . substr(md5($string . $keyb), 0, 16) . $string;
     $string_length = strlen($string);
     $result = '';
     $box = range(0, 255);
@@ -130,20 +130,20 @@ function authcode($string, $operation = 'DECODE', $key = '', $expiry = 0)
         $result .= chr(ord($string[$i]) ^ ($box[($box[$a] + $box[$j]) % 256]));
     }
     if ($operation == 'DECODE') {
-        if (((int)substr($result, 0, 10) == 0 || (int)substr($result, 0, 10) - time() > 0) && substr($result, 10, 16) == substr(md5(substr($result, 26).$keyb), 0, 16)) {
+        if (((int)substr($result, 0, 10) == 0 || (int)substr($result, 0, 10) - time() > 0) && substr($result, 10, 16) == substr(md5(substr($result, 26) . $keyb), 0, 16)) {
             return substr($result, 26);
         } else {
             return '';
         }
     } else {
-        return $keyc.base64_encode($result);
+        return $keyc . base64_encode($result);
     }
 }
 
 function random($length, $numeric = 0)
 {
-    $seed = base_convert(md5(microtime().$_SERVER['DOCUMENT_ROOT']), 16, $numeric ? 10 : 35);
-    $seed = $numeric ? (str_replace('0', '', $seed).'012340567890') : ($seed.'zZ'.strtoupper($seed));
+    $seed = base_convert(md5(microtime() . $_SERVER['DOCUMENT_ROOT']), 16, $numeric ? 10 : 35);
+    $seed = $numeric ? (str_replace('0', '', $seed) . '012340567890') : ($seed . 'zZ' . strtoupper($seed));
     $hash = '';
     $max = strlen($seed) - 1;
     for ($i = 0; $i < $length; $i++) {
@@ -204,9 +204,10 @@ function getSid()
 {
     return md5(uniqid(mt_rand(), true) . microtime());
 }
+
 function getMd5Pwd($pwd, $salt = null)
 {
-    return md5(md5($pwd) . md5('1277180438'.$salt));
+    return md5(md5($pwd) . md5('1277180438' . $salt));
 }
 
 function isNullOrEmpty($str)
@@ -283,15 +284,15 @@ function convert_second($s)
 {
     $m = floor($s / 60);
     if ($m == 0) {
-        return $s.'秒';
+        return $s . '秒';
     } else {
         $s = $s % 60;
         $h = floor($m / 60);
         if ($h == 0) {
-            return $m.'分钟'.$s.'秒';
+            return $m . '分钟' . $s . '秒';
         } else {
             $m = $m % 60;
-            return $h.'小时'.$m.'分钟'.$s.'秒';
+            return $h . '小时' . $m . '分钟' . $s . '秒';
         }
     }
 }
@@ -304,7 +305,7 @@ function getMainDomain($host)
         $domains = Db::name('domain')->column('name');
         $domains_alias = Db::name('domain_alias')->column('name');
         $domains = array_merge($domains, $domains_alias);
-        config(['domains'=>$domains], 'temp');
+        config(['domains' => $domains], 'temp');
     }
     foreach ($domains as $domain) {
         if ($host === $domain || str_ends_with($host, '.' . $domain)) {
@@ -484,7 +485,7 @@ function http_request($url, $data = null, $referer = null, $cookie = null, $head
     if ($proxy) {
         $proxy_server = config_get('proxy_server');
         $proxy_port = intval(config_get('proxy_port'));
-        $proxy_userpwd = config_get('proxy_user').':'.config_get('proxy_pwd');
+        $proxy_userpwd = config_get('proxy_user') . ':' . config_get('proxy_pwd');
         $proxy_type = config_get('proxy_type');
 
         if (empty($proxy_server) || empty($proxy_port)) {
@@ -574,14 +575,17 @@ function curl_set_proxy(&$ch)
     curl_setopt($ch, CURLOPT_PROXYTYPE, $proxy_type);
 }
 
-function convertDomainToAscii($domain) {
+function convertDomainToAscii($domain)
+{
     if (preg_match('/[\x{4e00}-\x{9fa5}]/u', $domain)) {
         return idn_to_ascii($domain);
     } else {
         return $domain;
     }
 }
-function convertDomainToUtf8($domain) {
+
+function convertDomainToUtf8($domain)
+{
     if (preg_match('/^xn--/', $domain)) {
         return idn_to_utf8($domain);
     } else {

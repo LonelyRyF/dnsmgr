@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\BaiduCloud;
+use app\lib\DnsInterface;
 use Exception;
 
 class baidu implements DnsInterface
@@ -59,6 +59,35 @@ class baidu implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_reuqest($method, $path, $query = null, $params = null)
+    {
+        try {
+            return $this->client->request($method, $path, $query, $params);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $query = [];
@@ -66,7 +95,7 @@ class baidu implements DnsInterface
             $SubDomain = strtolower($SubDomain);
             $query['rr'] = $SubDomain;
         }
-        $data = $this->send_reuqest('GET', '/v1/dns/zone/'.$this->domain.'/record', $query);
+        $data = $this->send_reuqest('GET', '/v1/dns/zone/' . $this->domain . '/record', $query);
         if ($data) {
             $list = [];
             foreach ($data['records'] as $row) {
@@ -116,24 +145,18 @@ class baidu implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
-    {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
-    }
+    //修改解析记录
 
-    //获取解析记录详细信息
     public function getDomainRecordInfo($RecordId)
     {
         $query = ['id' => $RecordId];
-        $data = $this->send_reuqest('GET', '/v1/dns/zone/'.$this->domain.'/record', $query);
+        $data = $this->send_reuqest('GET', '/v1/dns/zone/' . $this->domain . '/record', $query);
         if ($data && !empty($data['records'])) {
             $data = $data['records'][0];
             return [
                 'RecordId' => $data['id'],
                 'Domain' => rtrim($data['zone_name'], '.'),
-                'Name' => str_replace('.'.$data['zone_name'], '', $data['name']),
+                'Name' => str_replace('.' . $data['zone_name'], '', $data['name']),
                 'Type' => $data['type'],
                 'Value' => $data['value'],
                 'Line' => $data['line'],
@@ -148,52 +171,64 @@ class baidu implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //修改解析记录备注
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $params = ['rr' => $Name, 'type' => $this->convertType($Type), 'value' => $Value, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
         if ($Type == 'MX') $params['priority'] = intval($MX);
         $query = ['clientToken' => getSid()];
-        return $this->send_reuqest('POST', '/v1/dns/zone/'.$this->domain.'/record', $query, $params);
+        return $this->send_reuqest('POST', '/v1/dns/zone/' . $this->domain . '/record', $query, $params);
     }
 
-    //修改解析记录
+    //删除解析记录
+
+    private function convertType($type)
+    {
+        return $type;
+    }
+
+    //设置解析记录状态
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $params = ['rr' => $Name, 'type' => $this->convertType($Type), 'value' => $Value, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
         if ($Type == 'MX') $params['priority'] = intval($MX);
         $query = ['clientToken' => getSid()];
-        return $this->send_reuqest('PUT', '/v1/dns/zone/'.$this->domain.'/record/'.$RecordId, $query, $params);
+        return $this->send_reuqest('PUT', '/v1/dns/zone/' . $this->domain . '/record/' . $RecordId, $query, $params);
     }
 
-    //修改解析记录备注
+    //获取解析记录操作日志
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取解析线路列表
+
     public function deleteDomainRecord($RecordId)
     {
         $query = ['clientToken' => getSid()];
-        return $this->send_reuqest('DELETE', '/v1/dns/zone/'.$this->domain.'/record/'.$RecordId, $query);
+        return $this->send_reuqest('DELETE', '/v1/dns/zone/' . $this->domain . '/record/' . $RecordId, $query);
     }
 
-    //设置解析记录状态
+    //获取域名概览信息
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $Status = $Status == '1' ? 'enable' : 'disable';
         $query = [$Status => '', 'clientToken' => getSid()];
-        return $this->send_reuqest('PUT', '/v1/dns/zone/'.$this->domain.'/record/'.$RecordId, $query);
+        return $this->send_reuqest('PUT', '/v1/dns/zone/' . $this->domain . '/record/' . $RecordId, $query);
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         return [
@@ -206,17 +241,6 @@ class baidu implements DnsInterface
         ];
     }
 
-    //获取域名概览信息
-    public function getDomainInfo()
-    {
-        $res = $this->getDomainList($this->domain);
-        if ($res && !empty($res['list'])) {
-            return $res['list'][0];
-        }
-        return false;
-    }
-
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -235,24 +259,12 @@ class baidu implements DnsInterface
         return false;
     }
 
-    private function convertType($type)
+    public function getDomainInfo()
     {
-        return $type;
-    }
-
-    private function send_reuqest($method, $path, $query = null, $params = null)
-    {
-        try{
-            return $this->client->request($method, $path, $query, $params);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
+        $res = $this->getDomainList($this->domain);
+        if ($res && !empty($res['list'])) {
+            return $res['list'][0];
         }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+        return false;
     }
 }

@@ -634,13 +634,6 @@ class DnsHelper
         return self::$dns_config;
     }
 
-    private static function getConfig($aid)
-    {
-        $account = Db::name('account')->where('id', $aid)->find();
-        if (!$account) return false;
-        return $account;
-    }
-
     /**
      * @return DnsInterface|bool
      */
@@ -658,6 +651,13 @@ class DnsHelper
             return $model;
         }
         return false;
+    }
+
+    private static function getConfig($aid)
+    {
+        $account = Db::name('account')->where('id', $aid)->find();
+        if (!$account) return false;
+        return $account;
     }
 
     /**

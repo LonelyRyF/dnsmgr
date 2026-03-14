@@ -2,8 +2,8 @@
 
 namespace app\lib\dns;
 
-use app\lib\DnsInterface;
 use app\lib\client\HuaweiCloud;
+use app\lib\DnsInterface;
 use Exception;
 
 class huawei implements DnsInterface
@@ -60,6 +60,34 @@ class huawei implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function send_request($method, $path, $query = null, $params = null)
+    {
+        try {
+            return $this->client->request($method, $path, $query, $params);
+        } catch (Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //获取解析记录详细信息
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //添加解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $offset = ($PageNumber - 1) * $PageSize;
@@ -73,7 +101,7 @@ class huawei implements DnsInterface
             $query['name'] = $SubDomain;
             $query['search_mode'] = 'equal';
         }
-        $data = $this->send_request('GET', '/v2.1/zones/'.$this->domainid.'/recordsets', $query);
+        $data = $this->send_request('GET', '/v2.1/zones/' . $this->domainid . '/recordsets', $query);
         if ($data) {
             $list = [];
             foreach ($data['recordsets'] as $row) {
@@ -99,16 +127,21 @@ class huawei implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    //修改解析记录
+
+    private function getHost($Name)
     {
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+        if ($Name == '@') $Name = '';
+        else $Name .= '.';
+        $Name .= $this->domain . '.';
+        return $Name;
     }
 
-    //获取解析记录详细信息
+    //修改解析记录备注
+
     public function getDomainRecordInfo($RecordId)
     {
-        $data = $this->send_request('GET', '/v2.1/zones/'.$this->domainid.'/recordsets/'.$RecordId);
+        $data = $this->send_request('GET', '/v2.1/zones/' . $this->domainid . '/recordsets/' . $RecordId);
         if ($data) {
             $name = substr($data['name'], 0, -(strlen($data['zone_name']) + 1));
             if ($name == '') $name = '@';
@@ -130,7 +163,8 @@ class huawei implements DnsInterface
         return false;
     }
 
-    //添加解析记录
+    //删除解析记录
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $Name = $this->getHost($Name);
@@ -138,11 +172,19 @@ class huawei implements DnsInterface
         $records = array_reverse(explode(',', $Value));
         $params = ['name' => $Name, 'type' => $this->convertType($Type), 'records' => $records, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
         if ($Weight > 0) $params['weight'] = intval($Weight);
-        $data = $this->send_request('POST', '/v2.1/zones/'.$this->domainid.'/recordsets', null, $params);
+        $data = $this->send_request('POST', '/v2.1/zones/' . $this->domainid . '/recordsets', null, $params);
         return is_array($data) ? $data['id'] : false;
     }
 
-    //修改解析记录
+    //设置解析记录状态
+
+    private function convertType($type)
+    {
+        return $type;
+    }
+
+    //获取解析记录操作日志
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $Name = $this->getHost($Name);
@@ -150,42 +192,43 @@ class huawei implements DnsInterface
         $records = array_reverse(explode(',', $Value));
         $params = ['name' => $Name, 'type' => $this->convertType($Type), 'records' => $records, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
         if ($Weight > 0) $params['weight'] = intval($Weight);
-        $data = $this->send_request('PUT', '/v2.1/zones/'.$this->domainid.'/recordsets/'.$RecordId, null, $params);
+        $data = $this->send_request('PUT', '/v2.1/zones/' . $this->domainid . '/recordsets/' . $RecordId, null, $params);
         return is_array($data);
     }
 
-    //修改解析记录备注
+    //获取解析线路列表
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
     public function deleteDomainRecord($RecordId)
     {
-        $data = $this->send_request('DELETE', '/v2.1/zones/'.$this->domainid.'/recordsets/'.$RecordId);
+        $data = $this->send_request('DELETE', '/v2.1/zones/' . $this->domainid . '/recordsets/' . $RecordId);
         return is_array($data);
     }
 
-    //设置解析记录状态
+    //获取域名概览信息
+
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $Status = $Status == '1' ? 'ENABLE' : 'DISABLE';
         $params = ['status' => $Status];
-        $data = $this->send_request('PUT', '/v2.1/recordsets/'.$RecordId.'/statuses/set', null, $params);
+        $data = $this->send_request('PUT', '/v2.1/recordsets/' . $RecordId . '/statuses/set', null, $params);
         return is_array($data);
     }
 
-    //获取解析记录操作日志
+    //获取域名最低TTL
+
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
-        $file_path = app()->getBasePath().'data'.DIRECTORY_SEPARATOR.'huawei_line.json';
+        $file_path = app()->getBasePath() . 'data' . DIRECTORY_SEPARATOR . 'huawei_line.json';
         $content = file_get_contents($file_path);
         $data = json_decode($content, true);
         if ($data) {
@@ -203,10 +246,10 @@ class huawei implements DnsInterface
     {
         foreach ($line_list as $row) {
             if ($rootId && $rootId !== 1) {
-                $row['id'] = $rootId.'_'.$row['id'];
+                $row['id'] = $rootId . '_' . $row['id'];
             }
             if ($rootName && $rootName !== 1) {
-                $row['zh'] = $rootName.'_'.$row['zh'];
+                $row['zh'] = $rootName . '_' . $row['zh'];
             }
             $list[$row['id']] = ['name' => $row['zh'], 'parent' => $parent];
             if (isset($row['children']) && !empty($row['children'])) {
@@ -215,13 +258,11 @@ class huawei implements DnsInterface
         }
     }
 
-    //获取域名概览信息
     public function getDomainInfo()
     {
-        return $this->send_request('GET', '/v2/zones/'.$this->domainid);
+        return $this->send_request('GET', '/v2/zones/' . $this->domainid);
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         return false;
@@ -237,34 +278,5 @@ class huawei implements DnsInterface
             return ['id' => $data['id'], 'name' => rtrim($data['name'], '.')];
         }
         return false;
-    }
-
-    private function convertType($type)
-    {
-        return $type;
-    }
-
-    private function getHost($Name)
-    {
-        if ($Name == '@') $Name = '';
-        else $Name .= '.';
-        $Name .= $this->domain . '.';
-        return $Name;
-    }
-
-    private function send_request($method, $path, $query = null, $params = null)
-    {
-        try{
-            return $this->client->request($method, $path, $query, $params);
-        }catch(Exception $e){
-            $this->setError($e->getMessage());
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

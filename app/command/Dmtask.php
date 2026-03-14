@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace app\command;
 
+use app\service\TaskRunner;
 use Exception;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Argument;
 use think\console\input\Option;
 use think\console\Output;
-use think\facade\Db;
 use think\facade\Config;
-use app\service\TaskRunner;
+use think\facade\Db;
 
 class Dmtask extends Command
 {

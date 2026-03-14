@@ -31,77 +31,6 @@ class kangleadmin implements DeployInterface
         $this->login();
     }
 
-    public function deploy($fullchain, $privatekey, $config, &$info)
-    {
-        if (empty($config['name'])) throw new Exception('网站用户名不能为空');
-        $this->login();
-        $this->log('登录成功 cookie:' . $this->cookie);
-        $this->loginVhost($config['name']);
-
-        if ($config['type'] == '1' && !empty($config['domains'])) {
-            $domains = explode("\n", $config['domains']);
-            $success = 0;
-            $errmsg = null;
-            foreach ($domains as $domain) {
-                $domain = trim($domain);
-                if (empty($domain)) continue;
-                try {
-                    $this->deployDomain($domain, $fullchain, $privatekey);
-                    $this->log("域名 {$domain} 证书部署成功");
-                    $success++;
-                } catch (Exception $e) {
-                    $errmsg = $e->getMessage();
-                    $this->log("域名 {$domain} 证书部署失败：" . $errmsg);
-                }
-            }
-            if ($success == 0) {
-                throw new Exception($errmsg ? $errmsg : '要部署的域名不存在');
-            }
-        } else {
-            $this->deployAccount($fullchain, $privatekey);
-            $this->log("账号级SSL证书部署成功");
-        }
-    }
-
-    private function deployDomain($domain, $fullchain, $privatekey)
-    {
-        $path = '/vhost/?c=ssl&a=domainSsl';
-        $post = [
-            'domain' => $domain,
-            'certificate' => $fullchain,
-            'certificate_key' => $privatekey,
-        ];
-        $response = http_request($this->url . $path, http_build_query($post), null, $this->cookie, null, $this->proxy);
-        if (strpos($response['body'], '成功')) {
-            return true;
-        } elseif (preg_match('/alert\(\'(.*?)\'\)/i', $response['body'], $match)) {
-            throw new Exception(htmlspecialchars($match[1]));
-        } elseif (strlen($response['body']) > 3 && strlen($response['body']) < 50) {
-            throw new Exception(htmlspecialchars($response['body']));
-        } else {
-            throw new Exception('原因未知(httpCode=' . $response['code'] . ')');
-        }
-    }
-
-    private function deployAccount($fullchain, $privatekey)
-    {
-        $path = '/vhost/?c=ssl&a=ssl';
-        $post = [
-            'certificate' => $fullchain,
-            'certificate_key' => $privatekey,
-        ];
-        $response = http_request($this->url . $path, http_build_query($post), null, $this->cookie, null, $this->proxy);
-        if (strpos($response['body'], '成功')) {
-            return true;
-        } elseif (preg_match('/alert\(\'(.*?)\'\)/i', $response['body'], $match)) {
-            throw new Exception(htmlspecialchars($match[1]));
-        } elseif (strlen($response['body']) > 3 && strlen($response['body']) < 50) {
-            throw new Exception(htmlspecialchars($response['body']));
-        } else {
-            throw new Exception('原因未知(httpCode=' . $response['code'] . ')');
-        }
-    }
-
     private function login()
     {
         $url = $this->url . $this->path . '/index.php?c=sso&a=hello&url=' . urlencode($this->url . $this->path . '/index.php?');
@@ -148,6 +77,45 @@ class kangleadmin implements DeployInterface
         }
     }
 
+    public function deploy($fullchain, $privatekey, $config, &$info)
+    {
+        if (empty($config['name'])) throw new Exception('网站用户名不能为空');
+        $this->login();
+        $this->log('登录成功 cookie:' . $this->cookie);
+        $this->loginVhost($config['name']);
+
+        if ($config['type'] == '1' && !empty($config['domains'])) {
+            $domains = explode("\n", $config['domains']);
+            $success = 0;
+            $errmsg = null;
+            foreach ($domains as $domain) {
+                $domain = trim($domain);
+                if (empty($domain)) continue;
+                try {
+                    $this->deployDomain($domain, $fullchain, $privatekey);
+                    $this->log("域名 {$domain} 证书部署成功");
+                    $success++;
+                } catch (Exception $e) {
+                    $errmsg = $e->getMessage();
+                    $this->log("域名 {$domain} 证书部署失败：" . $errmsg);
+                }
+            }
+            if ($success == 0) {
+                throw new Exception($errmsg ? $errmsg : '要部署的域名不存在');
+            }
+        } else {
+            $this->deployAccount($fullchain, $privatekey);
+            $this->log("账号级SSL证书部署成功");
+        }
+    }
+
+    private function log($txt)
+    {
+        if ($this->logger) {
+            call_user_func($this->logger, $txt);
+        }
+    }
+
     private function loginVhost($name)
     {
         $url = $this->url . $this->path . '/index.php?c=vhost&a=impLogin&name=' . $name;
@@ -159,15 +127,47 @@ class kangleadmin implements DeployInterface
         }
     }
 
+    private function deployDomain($domain, $fullchain, $privatekey)
+    {
+        $path = '/vhost/?c=ssl&a=domainSsl';
+        $post = [
+            'domain' => $domain,
+            'certificate' => $fullchain,
+            'certificate_key' => $privatekey,
+        ];
+        $response = http_request($this->url . $path, http_build_query($post), null, $this->cookie, null, $this->proxy);
+        if (strpos($response['body'], '成功')) {
+            return true;
+        } elseif (preg_match('/alert\(\'(.*?)\'\)/i', $response['body'], $match)) {
+            throw new Exception(htmlspecialchars($match[1]));
+        } elseif (strlen($response['body']) > 3 && strlen($response['body']) < 50) {
+            throw new Exception(htmlspecialchars($response['body']));
+        } else {
+            throw new Exception('原因未知(httpCode=' . $response['code'] . ')');
+        }
+    }
+
+    private function deployAccount($fullchain, $privatekey)
+    {
+        $path = '/vhost/?c=ssl&a=ssl';
+        $post = [
+            'certificate' => $fullchain,
+            'certificate_key' => $privatekey,
+        ];
+        $response = http_request($this->url . $path, http_build_query($post), null, $this->cookie, null, $this->proxy);
+        if (strpos($response['body'], '成功')) {
+            return true;
+        } elseif (preg_match('/alert\(\'(.*?)\'\)/i', $response['body'], $match)) {
+            throw new Exception(htmlspecialchars($match[1]));
+        } elseif (strlen($response['body']) > 3 && strlen($response['body']) < 50) {
+            throw new Exception(htmlspecialchars($response['body']));
+        } else {
+            throw new Exception('原因未知(httpCode=' . $response['code'] . ')');
+        }
+    }
+
     public function setLogger($func)
     {
         $this->logger = $func;
-    }
-
-    private function log($txt)
-    {
-        if ($this->logger) {
-            call_user_func($this->logger, $txt);
-        }
     }
 }

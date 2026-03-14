@@ -57,6 +57,79 @@ class dnsla implements DnsInterface
     }
 
     //获取解析记录列表
+
+    private function execute($method, $path, $params = null)
+    {
+        $token = base64_encode($this->apiid . ':' . $this->apisecret);
+        $header = [
+            'Authorization' => 'Basic ' . $token,
+            'Content-Type' => 'application/json; charset=utf-8'
+        ];
+        if ($method == 'POST' || $method == 'PUT') {
+            $response = $this->curl($method, $path, $header, json_encode($params));
+        } else {
+            if ($params) {
+                $path .= '?' . http_build_query($params);
+            }
+            $response = $this->curl($method, $path, $header);
+        }
+        if (!$response) {
+            return false;
+        }
+        $arr = json_decode($response, true);
+        if ($arr) {
+            if ($arr['code'] == 200) {
+                return $arr['data'];
+            } else {
+                $this->setError($arr['msg']);
+                return false;
+            }
+        } else {
+            $this->setError('返回数据解析失败');
+            return false;
+        }
+    }
+
+    //获取子域名解析记录列表
+
+    private function curl($method, $path, $header, $body = null)
+    {
+        $url = $this->baseUrl . $path;
+        try {
+            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            return false;
+        }
+        if ($response['code'] == 200) {
+            return $response['body'];
+        } elseif ($response['code'] == 401) {
+            $this->setError('认证失败');
+            return false;
+        } else {
+            $this->setError('http code: ' . $response['code']);
+            return false;
+        }
+    }
+
+    //获取解析记录详细信息
+
+    private function setError($message)
+    {
+        $this->error = $message;
+        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
+    }
+
+    //添加解析记录
+
+    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    {
+        if ($SubDomain == '') $SubDomain = '@';
+        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+    }
+
+    //修改解析记录
+
     public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
     {
         $param = ['domainId' => $this->domainid, 'pageIndex' => $PageNumber, 'pageSize' => $PageSize];
@@ -99,20 +172,31 @@ class dnsla implements DnsInterface
         return false;
     }
 
-    //获取子域名解析记录列表
-    public function getSubDomainRecords($SubDomain, $PageNumber = 1, $PageSize = 20, $Type = null, $Line = null)
+    //修改解析记录备注
+
+    private function convertType($type)
     {
-        if ($SubDomain == '') $SubDomain = '@';
-        return $this->getDomainRecords($PageNumber, $PageSize, null, $SubDomain, null, $Type, $Line);
+        $typeList = array_flip($this->typeList);
+        return $typeList[$type];
     }
 
-    //获取解析记录详细信息
+    //删除解析记录
+
+    private function convertTypeId($typeId, $domaint)
+    {
+        if ($typeId == 256) return $domaint ? 'REDIRECT_URL' : 'FORWARD_URL';
+        return $this->typeList[$typeId];
+    }
+
+    //设置解析记录状态
+
     public function getDomainRecordInfo($RecordId)
     {
         return false;
     }
 
-    //添加解析记录
+    //获取解析记录操作日志
+
     public function addDomainRecord($Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['domainId' => $this->domainid, 'type' => $this->convertType($Type), 'host' => $Name, 'data' => $Value, 'ttl' => intval($TTL), 'lineId' => $Line];
@@ -129,7 +213,8 @@ class dnsla implements DnsInterface
         return is_array($data) ? $data['id'] : false;
     }
 
-    //修改解析记录
+    //获取解析线路列表
+
     public function updateDomainRecord($RecordId, $Name, $Type, $Value, $Line = '0', $TTL = 600, $MX = 1, $Weight = null, $Remark = null)
     {
         $param = ['id' => $RecordId, 'type' => $this->convertType($Type), 'host' => $Name, 'data' => $Value, 'ttl' => intval($TTL), 'lineId' => $Line];
@@ -146,13 +231,15 @@ class dnsla implements DnsInterface
         return $data !== false;
     }
 
-    //修改解析记录备注
+    //获取域名信息
+
     public function updateDomainRecordRemark($RecordId, $Remark)
     {
         return false;
     }
 
-    //删除解析记录
+    //获取域名最低TTL
+
     public function deleteDomainRecord($RecordId)
     {
         $param = ['id' => $RecordId];
@@ -160,7 +247,6 @@ class dnsla implements DnsInterface
         return $data !== false;
     }
 
-    //设置解析记录状态
     public function setDomainRecordStatus($RecordId, $Status)
     {
         $param = ['id' => $RecordId, 'disable' => $Status == '0' ? true : false];
@@ -168,13 +254,11 @@ class dnsla implements DnsInterface
         return $data !== false;
     }
 
-    //获取解析记录操作日志
     public function getDomainRecordLog($PageNumber = 1, $PageSize = 20, $KeyWord = null, $StartDate = null, $endDate = null)
     {
         return false;
     }
 
-    //获取解析线路列表
     public function getRecordLine()
     {
         $param = ['domain' => $this->domain];
@@ -191,7 +275,6 @@ class dnsla implements DnsInterface
         return false;
     }
 
-    //获取域名信息
     public function getDomainInfo()
     {
         $param = ['id' => $this->domainid];
@@ -199,7 +282,6 @@ class dnsla implements DnsInterface
         return $data;
     }
 
-    //获取域名最低TTL
     public function getMinTTL()
     {
         $param = ['id' => $this->domainid];
@@ -218,75 +300,5 @@ class dnsla implements DnsInterface
             return ['id' => $data['id'], 'name' => $Domain];
         }
         return false;
-    }
-
-    private function convertType($type)
-    {
-        $typeList = array_flip($this->typeList);
-        return $typeList[$type];
-    }
-
-    private function convertTypeId($typeId, $domaint)
-    {
-        if ($typeId == 256) return $domaint ? 'REDIRECT_URL' : 'FORWARD_URL';
-        return $this->typeList[$typeId];
-    }
-
-    private function execute($method, $path, $params = null)
-    {
-        $token = base64_encode($this->apiid.':'.$this->apisecret);
-        $header = [
-            'Authorization' => 'Basic '.$token,
-            'Content-Type' => 'application/json; charset=utf-8'
-        ];
-        if ($method == 'POST' || $method == 'PUT') {
-            $response = $this->curl($method, $path, $header, json_encode($params));
-        } else {
-            if ($params) {
-                $path .= '?'.http_build_query($params);
-            }
-            $response = $this->curl($method, $path, $header);
-        }
-        if (!$response) {
-            return false;
-        }
-        $arr = json_decode($response, true);
-        if ($arr) {
-            if ($arr['code'] == 200) {
-                return $arr['data'];
-            } else {
-                $this->setError($arr['msg']);
-                return false;
-            }
-        } else {
-            $this->setError('返回数据解析失败');
-            return false;
-        }
-    }
-
-    private function curl($method, $path, $header, $body = null)
-    {
-        $url = $this->baseUrl . $path;
-        try {
-            $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
-        } catch (\Exception $e) {
-            $this->setError($e->getMessage());
-            return false;
-        }
-        if ($response['code'] == 200) {
-            return $response['body'];
-        } elseif ($response['code'] == 401) {
-            $this->setError('认证失败');
-            return false;
-        } else {
-            $this->setError('http code: '.$response['code']);
-            return false;
-        }
-    }
-
-    private function setError($message)
-    {
-        $this->error = $message;
-        //file_put_contents('logs.txt',date('H:i:s').' '.$message."\r\n", FILE_APPEND);
     }
 }

@@ -2,9 +2,9 @@
 
 namespace app\service;
 
+use app\lib\DnsHelper;
 use Exception;
 use think\facade\Db;
-use app\lib\DnsHelper;
 
 /**
  * CF优选IP
@@ -21,20 +21,128 @@ class OptimizeService
         if ($api == 2) {
             throw new Exception('xingpingcn.top 接口免费使用，无需密钥，无积分限制');
         } elseif ($api == 1) {
-            $url = 'https://api.hostmonit.com/get_license?license='.$key;
+            $url = 'https://api.hostmonit.com/get_license?license=' . $key;
         } else {
-            $url = 'https://www.wetest.vip/api/cf2dns/get_license?license='.$key;
+            $url = 'https://www.wetest.vip/api/cf2dns/get_license?license=' . $key;
         }
         $response = get_curl($url);
         $arr = json_decode($response, true);
         if (isset($arr['code']) && $arr['code'] == 200 && isset($arr['count'])) {
             return $arr['count'];
         } elseif (isset($arr['info'])) {
-            throw new Exception('获取剩余请求次数失败，'.$arr['info']);
+            throw new Exception('获取剩余请求次数失败，' . $arr['info']);
         } else {
             throw new Exception('获取剩余请求次数失败');
         }
     }
+
+    public function execute()
+    {
+        $minute = config_get('optimize_ip_min', '30');
+        $last = config_get('optimize_ip_time', null, true);
+        if ($last && strtotime($last) > time() - $minute * 60) {
+            return false;
+        }
+        $list = Db::name('optimizeip')->where('active', 1)->select();
+        if (count($list) == 0) {
+            return false;
+        }
+        echo '开始执行IP优选任务，共获取到' . count($list) . '个待执行任务' . "\n";
+        foreach ($list as $row) {
+            try {
+                $result = $this->execute_one($row);
+                Db::name('optimizeip')->where('id', $row['id'])->update(['status' => 1, 'errmsg' => null, 'updatetime' => date('Y-m-d H:i:s')]);
+                echo '优选任务' . $row['id'] . '执行成功：' . $result . "\n";
+            } catch (Exception $e) {
+                Db::name('optimizeip')->where('id', $row['id'])->update(['status' => 2, 'errmsg' => $e->getMessage(), 'updatetime' => date('Y-m-d H:i:s')]);
+                echo '优选任务' . $row['id'] . '执行失败：' . $e->getMessage() . "\n";
+            }
+        }
+        config_set('optimize_ip_time', date("Y-m-d H:i:s"));
+        return true;
+    }
+
+    public function execute_one($row)
+    {
+        $this->add_num = 0;
+        $this->change_num = 0;
+        $this->del_num = 0;
+        $ip_types = explode(',', $row['ip_type']);
+        foreach ($ip_types as $ip_type) {
+            if (empty($ip_type)) {
+                continue;
+            }
+
+            $drow = Db::name('domain')->alias('A')->join('account B', 'A.aid = B.id')->where('A.id', $row['did'])->field('A.*,B.type')->find();
+            if (!$drow) {
+                throw new Exception('域名不存在（ID：' . $row['did'] . '）');
+            }
+            if (!isset(DnsHelper::$line_name[$drow['type']])) {
+                throw new Exception('不支持的DNS服务商');
+            }
+
+            $info = $this->get_ip_address2($row['cdn_type'], $ip_type);
+
+            $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+            $domainRecords = $dns->getSubDomainRecords($row['rr'], 1, 100);
+            if (!$domainRecords) {
+                throw new Exception('获取记录列表失败，' . $dns->getError());
+            }
+
+            if ($row['type'] == 1 && isset($info['DEF']) && !empty($info['DEF'])) {
+                $row['type'] = 0;
+            }
+
+            foreach ($info as $line => $iplist) {
+                if (empty($iplist)) {
+                    continue;
+                }
+                $record_num = $row['recordnum'];
+                $get_ips = array_column($iplist, 'ip');
+                if ($drow['type'] == 'huawei') {
+                    sort($get_ips);
+                    $get_ips = array_slice($get_ips, 0, $row['recordnum']);
+                    $get_ips = [implode(',', $get_ips)];
+                    $record_num = 1;
+                }
+                if ($row['type'] == 1 && $line == 'CT') {
+                    $line = 'DEF';
+                }
+                if (!isset(DnsHelper::$line_name[$drow['type']][$line])) {
+                    continue;
+                }
+                $line_name = DnsHelper::$line_name[$drow['type']][$line];
+                $this->process_dns_line($dns, $row, $domainRecords['list'], $record_num, $get_ips, $line_name, $ip_type);
+            }
+        }
+
+        return '成功添加' . $this->add_num . '条记录，修改' . $this->change_num . '条记录，删除' . $this->del_num . '条记录';
+    }
+
+    public function get_ip_address2($cdn_type = 1, $ip_type = 'v4')
+    {
+        $key = $cdn_type . '_' . $ip_type;
+        if (!isset($this->ip_address[$key])) {
+            $info = $this->get_ip_address($cdn_type, $ip_type);
+            $res = [];
+            if (isset($info['DEF'])) {
+                $res['DEF'] = $info['DEF'];
+            }
+            if (isset($info['CT'])) {
+                $res['CT'] = $info['CT'];
+            }
+            if (isset($info['CU'])) {
+                $res['CU'] = $info['CU'];
+            }
+            if (isset($info['CM'])) {
+                $res['CM'] = $info['CM'];
+            }
+            $this->ip_address[$key] = $res;
+        }
+        return $this->ip_address[$key];
+    }
+
+    //批量执行优选任务
 
     public function get_ip_address($cdn_type = 1, $ip_type = 'v4')
     {
@@ -64,13 +172,15 @@ class OptimizeService
         if (isset($arr['code']) && $arr['code'] == 200) {
             return $arr['info'];
         } elseif (isset($arr['info'])) {
-            throw new Exception('获取优选IP数据失败，'.$arr['info']);
+            throw new Exception('获取优选IP数据失败，' . $arr['info']);
         } elseif (isset($arr['msg'])) {
-            throw new Exception('获取优选IP数据失败，'.$arr['msg']);
+            throw new Exception('获取优选IP数据失败，' . $arr['msg']);
         } else {
             throw new Exception('获取优选IP数据失败，原因未知');
         }
     }
+
+    //执行单个优选任务
 
     /**
      * 从 xingpingcn.top 获取优选IP数据
@@ -107,13 +217,19 @@ class OptimizeService
             $info = [];
             // 转换格式：dianxin->CT, liantong->CU, yidong->CM, default->DEF
             if (isset($result['dianxin']) && is_array($result['dianxin'])) {
-                $info['CT'] = array_map(function($ip) { return ['ip' => $ip]; }, $result['dianxin']);
+                $info['CT'] = array_map(function ($ip) {
+                    return ['ip' => $ip];
+                }, $result['dianxin']);
             }
             if (isset($result['liantong']) && is_array($result['liantong'])) {
-                $info['CU'] = array_map(function($ip) { return ['ip' => $ip]; }, $result['liantong']);
+                $info['CU'] = array_map(function ($ip) {
+                    return ['ip' => $ip];
+                }, $result['liantong']);
             }
             if (isset($result['yidong']) && is_array($result['yidong'])) {
-                $info['CM'] = array_map(function($ip) { return ['ip' => $ip]; }, $result['yidong']);
+                $info['CM'] = array_map(function ($ip) {
+                    return ['ip' => $ip];
+                }, $result['yidong']);
             }
             // 不使用他的默认线路数据, 因为这真的是默认. 由后续逻辑自己决定是否把CT线路当DEF来用
             // if (isset($result['default']) && is_array($result['default'])) {
@@ -125,115 +241,8 @@ class OptimizeService
         }
     }
 
-    public function get_ip_address2($cdn_type = 1, $ip_type = 'v4')
-    {
-        $key = $cdn_type.'_'.$ip_type;
-        if (!isset($this->ip_address[$key])) {
-            $info = $this->get_ip_address($cdn_type, $ip_type);
-            $res = [];
-            if (isset($info['DEF'])) {
-                $res['DEF'] = $info['DEF'];
-            }
-            if (isset($info['CT'])) {
-                $res['CT'] = $info['CT'];
-            }
-            if (isset($info['CU'])) {
-                $res['CU'] = $info['CU'];
-            }
-            if (isset($info['CM'])) {
-                $res['CM'] = $info['CM'];
-            }
-            $this->ip_address[$key] = $res;
-        }
-        return $this->ip_address[$key];
-    }
-
-    //批量执行优选任务
-    public function execute()
-    {
-        $minute = config_get('optimize_ip_min', '30');
-        $last = config_get('optimize_ip_time', null, true);
-        if ($last && strtotime($last) > time() - $minute * 60) {
-            return false;
-        }
-        $list = Db::name('optimizeip')->where('active', 1)->select();
-        if (count($list) == 0) {
-            return false;
-        }
-        echo '开始执行IP优选任务，共获取到'.count($list).'个待执行任务'."\n";
-        foreach ($list as $row) {
-            try {
-                $result = $this->execute_one($row);
-                Db::name('optimizeip')->where('id', $row['id'])->update(['status' => 1, 'errmsg' => null, 'updatetime' => date('Y-m-d H:i:s')]);
-                echo '优选任务'.$row['id'].'执行成功：'.$result."\n";
-            } catch (Exception $e) {
-                Db::name('optimizeip')->where('id', $row['id'])->update(['status' => 2, 'errmsg' => $e->getMessage(), 'updatetime' => date('Y-m-d H:i:s')]);
-                echo '优选任务'.$row['id'].'执行失败：'.$e->getMessage()."\n";
-            }
-        }
-        config_set('optimize_ip_time', date("Y-m-d H:i:s"));
-        return true;
-    }
-
-    //执行单个优选任务
-    public function execute_one($row)
-    {
-        $this->add_num = 0;
-        $this->change_num = 0;
-        $this->del_num = 0;
-        $ip_types = explode(',', $row['ip_type']);
-        foreach ($ip_types as $ip_type) {
-            if (empty($ip_type)) {
-                continue;
-            }
-
-            $drow = Db::name('domain')->alias('A')->join('account B', 'A.aid = B.id')->where('A.id', $row['did'])->field('A.*,B.type')->find();
-            if (!$drow) {
-                throw new Exception('域名不存在（ID：'.$row['did'].'）');
-            }
-            if (!isset(DnsHelper::$line_name[$drow['type']])) {
-                throw new Exception('不支持的DNS服务商');
-            }
-
-            $info = $this->get_ip_address2($row['cdn_type'], $ip_type);
-
-            $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-            $domainRecords = $dns->getSubDomainRecords($row['rr'], 1, 100);
-            if (!$domainRecords) {
-                throw new Exception('获取记录列表失败，'.$dns->getError());
-            }
-
-            if ($row['type'] == 1 && isset($info['DEF']) && !empty($info['DEF'])) {
-                $row['type'] = 0;
-            }
-
-            foreach ($info as $line => $iplist) {
-                if (empty($iplist)) {
-                    continue;
-                }
-                $record_num = $row['recordnum'];
-                $get_ips = array_column($iplist, 'ip');
-                if ($drow['type'] == 'huawei') {
-                    sort($get_ips);
-                    $get_ips = array_slice($get_ips, 0, $row['recordnum']);
-                    $get_ips = [implode(',', $get_ips)];
-                    $record_num = 1;
-                }
-                if ($row['type'] == 1 && $line == 'CT') {
-                    $line = 'DEF';
-                }
-                if (!isset(DnsHelper::$line_name[$drow['type']][$line])) {
-                    continue;
-                }
-                $line_name = DnsHelper::$line_name[$drow['type']][$line];
-                $this->process_dns_line($dns, $row, $domainRecords['list'], $record_num, $get_ips, $line_name, $ip_type);
-            }
-        }
-
-        return '成功添加'.$this->add_num.'条记录，修改'.$this->change_num.'条记录，删除'.$this->del_num.'条记录';
-    }
-
     //处理单个线路的解析记录
+
     private function process_dns_line($dns, $row, $record_list, $record_num, $get_ips, $line_name, $ip_type)
     {
         $records = array_filter($record_list, function ($v) use ($line_name) {
@@ -274,14 +283,14 @@ class OptimizeService
                     if ($add_ip) {
                         $res = $dns->updateDomainRecord($record['RecordId'], $row['rr'], $ip_type == 'v6' ? 'AAAA' : 'A', $add_ip, $line_name, $row['ttl']);
                         if (!$res) {
-                            throw new Exception('修改解析失败，'.$dns->getError());
+                            throw new Exception('修改解析失败，' . $dns->getError());
                         }
                         $this->change_num++;
                         $correct_count++;
                     } else {
                         $res = $dns->deleteDomainRecord($record['RecordId']);
                         if (!$res) {
-                            throw new Exception('删除解析失败，'.$dns->getError());
+                            throw new Exception('删除解析失败，' . $dns->getError());
                         }
                         $this->del_num++;
                     }
@@ -292,7 +301,7 @@ class OptimizeService
             foreach ($add_ips as $add_ip) {
                 $res = $dns->addDomainRecord($row['rr'], $ip_type == 'v6' ? 'AAAA' : 'A', $add_ip, $line_name, $row['ttl']);
                 if (!$res) {
-                    throw new Exception('添加解析失败，'.$dns->getError());
+                    throw new Exception('添加解析失败，' . $dns->getError());
                 }
                 $this->add_num++;
                 $correct_count++;

@@ -3,12 +3,12 @@
 namespace app\controller;
 
 use app\BaseController;
-use think\facade\Db;
-use think\facade\View;
-use think\facade\Cache;
 use app\lib\DnsHelper;
 use app\service\ExpireNoticeService;
 use Exception;
+use think\facade\Cache;
+use think\facade\Db;
+use think\facade\View;
 
 class Domain extends BaseController
 {
@@ -245,6 +245,87 @@ class Domain extends BaseController
         return json(['total' => $total, 'rows' => $list]);
     }
 
+    public function alias()
+    {
+        $id = input('param.id/d');
+        $drow = Db::name('domain')->where('id', $id)->find();
+        if (!$drow) {
+            return $this->alert('error', '域名不存在');
+        }
+        if (!checkPermission(0, $drow['name'])) return $this->alert('error', '无权限');
+        if (request()->isAjax()) {
+            $act = input('param.act');
+            if ($act == 'add') {
+                $alias = input('post.alias', null, 'trim');
+                if (empty($alias)) {
+                    return json(['code' => -1, 'msg' => '参数不能为空']);
+                }
+                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+                if ($dns->addDomainAlias($alias)) {
+                    return json(['code' => 0, 'msg' => '添加域名别名成功']);
+                } else {
+                    return json(['code' => -1, 'msg' => '添加域名别名失败，' . $dns->getError()]);
+                }
+            } elseif ($act == 'delete') {
+                $alias_id = input('post.alias_id/d');
+                if (empty($alias_id)) {
+                    return json(['code' => -1, 'msg' => '参数不能为空']);
+                }
+                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+                if ($dns->deleteDomainAlias($alias_id)) {
+                    return json(['code' => 0, 'msg' => '删除域名别名成功']);
+                } else {
+                    return json(['code' => -1, 'msg' => '删除域名别名失败，' . $dns->getError()]);
+                }
+            }
+        }
+
+        $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+        $domainAliasList = $dns->domainAliasList();
+        if ($domainAliasList === false) $domainAliasList = [];
+
+        $this->updateAliasList($id, $domainAliasList);
+
+        View::assign('domainId', $id);
+        View::assign('domainName', $drow['name']);
+        View::assign('domainAliasList', $domainAliasList);
+        return view();
+    }
+
+    private function updateAliasList($id, $domainAliasList)
+    {
+        $domainAliases = array_column($domainAliasList, 'DomainAlias');
+        $addList = [];
+        $deleteList = [];
+        $existList = Db::name('domain_alias')->where('did', $id)->select()->toArray();
+        $existAliases = array_column($existList, 'name');
+        foreach ($existList as $item) {
+            if (!in_array($item['name'], $domainAliases)) {
+                $deleteList[] = $item['id'];
+            }
+        }
+        foreach ($domainAliases as $item) {
+            if (!in_array($item, $existAliases)) {
+                $addList[] = $item;
+            }
+        }
+        if (!empty($deleteList)) {
+            Db::name('domain_alias')->where('id', 'in', $deleteList)->delete();
+        }
+        if (!empty($addList)) {
+            $dataList = [];
+            foreach ($addList as $item) {
+                $dataList[] = [
+                    'did' => $id,
+                    'name' => $item,
+                ];
+            }
+            Db::name('domain_alias')->insertAll($dataList);
+        }
+    }
+
+    //获取解析线路和最小TTL
+
     public function domain_op()
     {
         if (!checkPermission(1)) return $this->alert('error', '无权限');
@@ -380,25 +461,6 @@ class Domain extends BaseController
         return json(['code' => 0, 'data' => ['total' => $result['total'], 'list' => $result['list']]]);
     }
 
-    //获取解析线路和最小TTL
-    private function get_line_and_ttl($drow)
-    {
-        $recordLine = cache('record_line_' . $drow['id']);
-        $minTTL = cache('min_ttl_' . $drow['id']);
-        if (empty($recordLine)) {
-            $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-            if (!$dns) throw new Exception('DNS模块不存在');
-            $recordLine = $dns->getRecordLine();
-            if (!$recordLine) throw new Exception('获取解析线路列表失败，' . $dns->getError());
-            cache('record_line_' . $drow['id'], $recordLine, 604800);
-            $minTTL = $dns->getMinTTL();
-            if ($minTTL) {
-                cache('min_ttl_' . $drow['id'], $minTTL, 604800);
-            }
-        }
-        return [$recordLine, $minTTL];
-    }
-
     public function domain_info()
     {
         $id = input('param.id/d');
@@ -431,6 +493,24 @@ class Domain extends BaseController
         }
 
         return json(['code' => 0, 'data' => $drow]);
+    }
+
+    private function get_line_and_ttl($drow)
+    {
+        $recordLine = cache('record_line_' . $drow['id']);
+        $minTTL = cache('min_ttl_' . $drow['id']);
+        if (empty($recordLine)) {
+            $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+            if (!$dns) throw new Exception('DNS模块不存在');
+            $recordLine = $dns->getRecordLine();
+            if (!$recordLine) throw new Exception('获取解析线路列表失败，' . $dns->getError());
+            cache('record_line_' . $drow['id'], $recordLine, 604800);
+            $minTTL = $dns->getMinTTL();
+            if ($minTTL) {
+                cache('min_ttl_' . $drow['id'], $minTTL, 604800);
+            }
+        }
+        return [$recordLine, $minTTL];
     }
 
     public function record()
@@ -561,11 +641,17 @@ class Domain extends BaseController
         $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
         $recordid = $dns->addDomainRecord($name, $type, $value, $line, $ttl, $mx, $weight, $remark);
         if ($recordid) {
-            $this->add_log($drow['name'], '添加解析', $name.' ['.$type.'] '.$value.' (线路:'.$line.' TTL:'.$ttl.')');
+            $this->add_log($drow['name'], '添加解析', $name . ' [' . $type . '] ' . $value . ' (线路:' . $line . ' TTL:' . $ttl . ')');
             return json(['code' => 0, 'msg' => '添加解析记录成功！']);
         } else {
             return json(['code' => -1, 'msg' => '添加解析记录失败，' . $dns->getError()]);
         }
+    }
+
+    private function add_log($domain, $action, $data)
+    {
+        if (strlen($data) > 500) $data = substr($data, 0, 500);
+        Db::name('log')->insert(['uid' => request()->user['id'], 'domain' => $domain, 'action' => $action, 'data' => $data, 'addtime' => date("Y-m-d H:i:s")]);
     }
 
     public function record_update()
@@ -600,12 +686,12 @@ class Domain extends BaseController
                 $recordinfo = json_decode($recordinfo, true);
                 if (is_array($recordinfo['Value'])) $recordinfo['Value'] = implode(',', $recordinfo['Value']);
                 if ($recordinfo['Name'] != $name || $recordinfo['Type'] != $type || $recordinfo['Value'] != $value) {
-                    $this->add_log($drow['name'], '修改解析', $recordinfo['Name'].' ['.$recordinfo['Type'].'] '.$recordinfo['Value'].' → '.$name.' ['.$type.'] '.$value.' (线路:'.$line.' TTL:'.$ttl.')');
-                } elseif($recordinfo['Line'] != $line || $recordinfo['TTL'] != $ttl) {
-                    $this->add_log($drow['name'], '修改解析', $name.' ['.$type.'] '.$value.' (线路:'.$line.' TTL:'.$ttl.')');
+                    $this->add_log($drow['name'], '修改解析', $recordinfo['Name'] . ' [' . $recordinfo['Type'] . '] ' . $recordinfo['Value'] . ' → ' . $name . ' [' . $type . '] ' . $value . ' (线路:' . $line . ' TTL:' . $ttl . ')');
+                } elseif ($recordinfo['Line'] != $line || $recordinfo['TTL'] != $ttl) {
+                    $this->add_log($drow['name'], '修改解析', $name . ' [' . $type . '] ' . $value . ' (线路:' . $line . ' TTL:' . $ttl . ')');
                 }
             } else {
-                $this->add_log($drow['name'], '修改解析', $name.' ['.$type.'] '.$value.' (线路:'.$line.' TTL:'.$ttl.')');
+                $this->add_log($drow['name'], '修改解析', $name . ' [' . $type . '] ' . $value . ' (线路:' . $line . ' TTL:' . $ttl . ')');
             }
             return json(['code' => 0, 'msg' => '修改解析记录成功！']);
         } else {
@@ -634,9 +720,9 @@ class Domain extends BaseController
             if ($recordinfo) {
                 $recordinfo = json_decode($recordinfo, true);
                 if (is_array($recordinfo['Value'])) $recordinfo['Value'] = implode(',', $recordinfo['Value']);
-                $this->add_log($drow['name'], '删除解析', $recordinfo['Name'].' ['.$recordinfo['Type'].'] '.$recordinfo['Value'].' (线路:'.$recordinfo['Line'].' TTL:'.$recordinfo['TTL'].')');
+                $this->add_log($drow['name'], '删除解析', $recordinfo['Name'] . ' [' . $recordinfo['Type'] . '] ' . $recordinfo['Value'] . ' (线路:' . $recordinfo['Line'] . ' TTL:' . $recordinfo['TTL'] . ')');
             } else {
-                $this->add_log($drow['name'], '删除解析', '记录ID:'.$recordid);
+                $this->add_log($drow['name'], '删除解析', '记录ID:' . $recordid);
             }
             return json(['code' => 0, 'msg' => '删除解析记录成功！']);
         } else {
@@ -667,9 +753,9 @@ class Domain extends BaseController
             if ($recordinfo) {
                 $recordinfo = json_decode($recordinfo, true);
                 if (is_array($recordinfo['Value'])) $recordinfo['Value'] = implode(',', $recordinfo['Value']);
-                $this->add_log($drow['name'], $action, $recordinfo['Name'].' ['.$recordinfo['Type'].'] '.$recordinfo['Value'].' (线路:'.$recordinfo['Line'].' TTL:'.$recordinfo['TTL'].')');
+                $this->add_log($drow['name'], $action, $recordinfo['Name'] . ' [' . $recordinfo['Type'] . '] ' . $recordinfo['Value'] . ' (线路:' . $recordinfo['Line'] . ' TTL:' . $recordinfo['TTL'] . ')');
             } else {
-                $this->add_log($drow['name'], $action, '记录ID:'.$recordid);
+                $this->add_log($drow['name'], $action, '记录ID:' . $recordid);
             }
             return json(['code' => 0, 'msg' => '操作成功！']);
         } else {
@@ -726,7 +812,7 @@ class Domain extends BaseController
             foreach ($recordinfo as $record) {
                 if ($dns->setDomainRecordStatus($record['RecordId'], '1')) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '启用解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '启用解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' (线路:' . $record['Line'] . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 }
             }
@@ -735,7 +821,7 @@ class Domain extends BaseController
             foreach ($recordinfo as $record) {
                 if ($dns->setDomainRecordStatus($record['RecordId'], '0')) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '暂停解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '暂停解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' (线路:' . $record['Line'] . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 }
             }
@@ -744,7 +830,7 @@ class Domain extends BaseController
             foreach ($recordinfo as $record) {
                 if ($dns->deleteDomainRecord($record['RecordId'])) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '删除解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '删除解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' (线路:' . $record['Line'] . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 }
             }
@@ -793,7 +879,7 @@ class Domain extends BaseController
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $type, $value, $record['Line'], $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' → '.$record['Name'].' ['.$type.'] '.$value.' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '修改解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' → ' . $record['Name'] . ' [' . $type . '] ' . $value . ' (线路:' . $record['Line'] . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 } else {
                     $fail++;
@@ -815,7 +901,7 @@ class Domain extends BaseController
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $record['Type'], $record['Value'], $line, $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$line.' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '修改解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' (线路:' . $line . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 } else {
                     $fail++;
@@ -865,7 +951,7 @@ class Domain extends BaseController
                 $thistype = empty($type) ? getDnsType($arr[1]) : $type;
                 $recordid = $dns->addDomainRecord($arr[0], $thistype, $arr[1], $line, $ttl, $mx, null, $remark);
                 if ($recordid) {
-                    $this->add_log($drow['name'], '添加解析', $arr[0].' ['.$thistype.'] '.$arr[1].' (线路:'.$line.' TTL:'.$ttl.')');
+                    $this->add_log($drow['name'], '添加解析', $arr[0] . ' [' . $thistype . '] ' . $arr[1] . ' (线路:' . $line . ' TTL:' . $ttl . ')');
                     $success++;
                 } else {
                     $fail++;
@@ -873,7 +959,7 @@ class Domain extends BaseController
             }
             if ($success > 0) {
                 return json(['code' => 0, 'msg' => '批量添加解析，成功' . $success . '条，失败' . $fail . '条']);
-            } elseif($fail > 0) {
+            } elseif ($fail > 0) {
                 return json(['code' => -1, 'msg' => '批量添加解析失败，' . $dns->getError()]);
             } else {
                 return json(['code' => -1, 'msg' => '批量添加解析失败，没有可添加的记录']);
@@ -946,7 +1032,7 @@ class Domain extends BaseController
                     return $item['Type'] == $type;
                 });
             }
-            if (empty($list)) return json(['code' => -1, 'msg' => '没有可修改的'.$type.'记录']);
+            if (empty($list)) return json(['code' => -1, 'msg' => '没有可修改的' . $type . '记录']);
 
             $list2 = array_filter($domainRecords['list'], function ($item) use ($line) {
                 return $item['Line'] == $line;
@@ -957,13 +1043,13 @@ class Domain extends BaseController
             $fail = 0;
             foreach ($list as $record) {
                 if ($name == '@' && ($record['Type'] == 'NS' || $record['Type'] == 'SOA')) continue;
-                
+
                 if ($ttl > 0) $record['TTL'] = $ttl;
                 if ($mx > 0) $record['MX'] = $mx;
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $type, $value, $record['Line'], $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
-                    $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' → '.$record['Name'].' ['.$type.'] '.$value.' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
+                    $this->add_log($drow['name'], '修改解析', $record['Name'] . ' [' . $record['Type'] . '] ' . $record['Value'] . ' → ' . $record['Name'] . ' [' . $type . '] ' . $value . ' (线路:' . $record['Line'] . ' TTL:' . $record['TTL'] . ')');
                     $success++;
                 } else {
                     $fail++;
@@ -971,7 +1057,7 @@ class Domain extends BaseController
             }
             if ($success > 0) {
                 return json(['code' => 0, 'msg' => '成功修改' . $success . '条解析记录']);
-            } elseif($fail > 0) {
+            } elseif ($fail > 0) {
                 return json(['code' => -1, 'msg' => $dns->getError()]);
             } else {
                 return json(['code' => -1, 'msg' => '没有可修改的记录']);
@@ -1004,13 +1090,6 @@ class Domain extends BaseController
         View::assign('domainName', $drow['name']);
         return view('log');
     }
-
-    private function add_log($domain, $action, $data)
-    {
-        if (strlen($data) > 500) $data = substr($data, 0, 500);
-        Db::name('log')->insert(['uid' => request()->user['id'], 'domain' => $domain, 'action' => $action, 'data' => $data, 'addtime' => date("Y-m-d H:i:s")]);
-    }
-
 
     public function weight()
     {
@@ -1046,7 +1125,7 @@ class Domain extends BaseController
                 if ($type == 'CNAME' || $dns->setWeightStatus($subdomain, $status, $type, $line)) {
                     if ($status == '1') {
                         $success = 0;
-                        foreach($weight as $recordid => $weight) {
+                        foreach ($weight as $recordid => $weight) {
                             if ($dns->updateRecordWeight($recordid, $weight)) {
                                 $success++;
                             }
@@ -1109,85 +1188,6 @@ class Domain extends BaseController
         $domainRecords = $dns->getWeightSubDomains($page, $limit, $keyword);
         if (!$domainRecords) return json(['total' => 0, 'rows' => []]);
         return json(['total' => $domainRecords['total'], 'rows' => $domainRecords['list']]);
-    }
-    
-    public function alias()
-    {
-        $id = input('param.id/d');
-        $drow = Db::name('domain')->where('id', $id)->find();
-        if (!$drow) {
-            return $this->alert('error', '域名不存在');
-        }
-        if (!checkPermission(0, $drow['name'])) return $this->alert('error', '无权限');
-        if (request()->isAjax()) {
-            $act = input('param.act');
-            if ($act == 'add') {
-                $alias = input('post.alias', null, 'trim');
-                if (empty($alias)) {
-                    return json(['code' => -1, 'msg' => '参数不能为空']);
-                }
-                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-                if ($dns->addDomainAlias($alias)) {
-                    return json(['code' => 0, 'msg' => '添加域名别名成功']);
-                } else {
-                    return json(['code' => -1, 'msg' => '添加域名别名失败，' . $dns->getError()]);
-                }
-            } elseif ($act == 'delete') {
-                $alias_id = input('post.alias_id/d');
-                if (empty($alias_id)) {
-                    return json(['code' => -1, 'msg' => '参数不能为空']);
-                }
-                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-                if ($dns->deleteDomainAlias($alias_id)) {
-                    return json(['code' => 0, 'msg' => '删除域名别名成功']);
-                } else {
-                    return json(['code' => -1, 'msg' => '删除域名别名失败，' . $dns->getError()]);
-                }
-            }
-        }
-
-        $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
-        $domainAliasList = $dns->domainAliasList();
-        if ($domainAliasList === false) $domainAliasList = [];
-
-        $this->updateAliasList($id, $domainAliasList);
-
-        View::assign('domainId', $id);
-        View::assign('domainName', $drow['name']);
-        View::assign('domainAliasList', $domainAliasList);
-        return view();
-    }
-
-    private function updateAliasList($id, $domainAliasList)
-    {
-        $domainAliases = array_column($domainAliasList, 'DomainAlias');
-        $addList = [];
-        $deleteList = [];
-        $existList = Db::name('domain_alias')->where('did', $id)->select()->toArray();
-        $existAliases = array_column($existList, 'name');
-        foreach ($existList as $item) {
-            if (!in_array($item['name'], $domainAliases)) {
-                $deleteList[] = $item['id'];
-            }
-        }
-        foreach ($domainAliases as $item) {
-            if (!in_array($item, $existAliases)) {
-                $addList[] = $item;
-            }
-        }
-        if (!empty($deleteList)) {
-            Db::name('domain_alias')->where('id', 'in', $deleteList)->delete();
-        }
-        if (!empty($addList)) {
-            $dataList = [];
-            foreach ($addList as $item) {
-                $dataList[] = [
-                    'did' => $id,
-                    'name' => $item,
-                ];
-            }
-            Db::name('domain_alias')->insertAll($dataList);
-        }
     }
 
     public function expire_notice()

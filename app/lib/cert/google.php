@@ -2,8 +2,8 @@
 
 namespace app\lib\cert;
 
-use app\lib\CertInterface;
 use app\lib\acme\ACMECert;
+use app\lib\CertInterface;
 use Exception;
 
 class google implements CertInterface
@@ -51,6 +51,21 @@ class google implements CertInterface
         $this->ac->loadAccountKey($key);
         $kid = $this->ac->registerEAB(true, $eab['kid'], $eab['key'], $this->config['email']);
         return ['kid' => $kid, 'key' => $key];
+    }
+
+    private function getEAB()
+    {
+        $api = "https://gts.rat.dev/eab";
+        $response = http_request($api, null, null, null, null, $this->config['proxy'] == 1, 'GET', 10);
+        $result = json_decode($response['body'], true);
+        if (!isset($result['msg'])) {
+            throw new Exception('解析返回数据失败：' . $response['body']);
+        } elseif ($result['msg'] != 'success') {
+            throw new Exception('获取EAB失败：' . $result['msg']);
+        } elseif (empty($result['data']['key_id']) || empty($result['data']['mac_key'])) {
+            throw new Exception('获取EAB失败：返回数据不完整');
+        }
+        return ['kid' => $result['data']['key_id'], 'key' => $result['data']['mac_key']];
     }
 
     public function buyCert($domainList, &$order)
@@ -123,20 +138,5 @@ class google implements CertInterface
     public function setLogger($func)
     {
         $this->ac->setLogger($func);
-    }
-
-    private function getEAB()
-    {
-        $api = "https://gts.rat.dev/eab";
-        $response = http_request($api, null, null, null, null, $this->config['proxy'] == 1, 'GET', 10);
-        $result = json_decode($response['body'], true);
-        if (!isset($result['msg'])) {
-            throw new Exception('解析返回数据失败：' . $response['body']);
-        } elseif ($result['msg'] != 'success') {
-            throw new Exception('获取EAB失败：' . $result['msg']);
-        } elseif (empty($result['data']['key_id']) || empty($result['data']['mac_key'])) {
-            throw new Exception('获取EAB失败：返回数据不完整');
-        }
-        return ['kid' => $result['data']['key_id'], 'key' => $result['data']['mac_key']];
     }
 }
