@@ -129,7 +129,7 @@ class tencent implements DeployInterface
             } elseif ($taskResult['Status'] == 2) {
                 throw new Exception('关联云资源查询任务执行失败：' . isset($taskResult['Error']) ? $taskResult['Error']['Message'] : '未知错误');
             }
-        };
+        }
         if (!$resource_result) {
             throw new Exception('关联云资源查询任务超时未完成，请稍后重试');
         }

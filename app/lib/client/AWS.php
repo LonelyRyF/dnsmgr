@@ -3,6 +3,7 @@
 namespace app\lib\client;
 
 use Exception;
+use SimpleXMLElement;
 
 /**
  * AWS
@@ -283,7 +284,7 @@ class AWS
      * @param string $method 请求方法
      * @param string $path 请求路径
      * @param array $params 请求参数
-     * @param \SimpleXMLElement $xml 请求XML
+     * @param SimpleXMLElement $xml 请求XML
      * @return array
      * @throws Exception
      */
@@ -332,7 +333,7 @@ class AWS
     private function array2xml($array, $xml = null, $parentTagName = 'root')
     {
         if ($xml === null) {
-            $xml = new \SimpleXMLElement('<root/>');
+            $xml = new SimpleXMLElement('<root/>');
         }
 
         foreach ($array as $key => $value) {

@@ -4,7 +4,6 @@ namespace app\controller;
 
 use app\BaseController;
 use app\service\ScheduleService;
-use think\facade\Cache;
 use think\facade\Db;
 use think\facade\View;
 

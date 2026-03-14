@@ -2,6 +2,7 @@
 // 应用公共文件
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Iodev\Whois\Factory;
 use think\facade\Db;
 use think\facade\Request;
 
@@ -596,7 +597,7 @@ function convertDomainToUtf8($domain)
 function getDomainDate($domain)
 {
     try {
-        $whois = \Iodev\Whois\Factory::get()->createWhois();
+        $whois = Factory::get()->createWhois();
         $info = $whois->loadDomainInfo($domain);
         if ($info) {
             if ($info->expirationDate > 0) {

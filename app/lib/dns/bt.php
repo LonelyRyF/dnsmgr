@@ -3,6 +3,7 @@
 namespace app\lib\dns;
 
 use app\lib\DnsInterface;
+use Exception;
 
 class bt implements DnsInterface
 {
@@ -109,7 +110,7 @@ class bt implements DnsInterface
         $url = $this->baseUrl . $path;
         try {
             $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->setError($e->getMessage());
             return false;
         }

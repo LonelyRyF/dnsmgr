@@ -29,7 +29,8 @@
                 <form class="form-horizontal" id="accountform" method="post" onsubmit="return false" role="form">
                     <div class="form-group">
                         <label class="col-sm-3 control-label no-padding-right" is-required>自动部署账户</label>
-                        <div class="col-sm-6"><select :disabled="action=='edit'" class="form-control" name="aid" required
+                        <div class="col-sm-6"><select :disabled="action=='edit'" class="form-control" name="aid"
+                                                      required
                                                       v-model="set.aid">
                             <option value="">--选择自动部署账户--</option>
                             {foreach $accounts as $k=>$v}
@@ -39,7 +40,8 @@
                     </div>
                     <div class="form-group">
                         <label class="col-sm-3 control-label no-padding-right" is-required>关联SSL证书</label>
-                        <div class="col-sm-6"><select class="form-control select2" name="oid" placeholder="选择要部署的SSL证书"
+                        <div class="col-sm-6"><select class="form-control select2" name="oid"
+                                                      placeholder="选择要部署的SSL证书"
                                                       v-model="set.oid">
                             {foreach $orders as $k=>$v}
                             <option value="{$k}">{$v.name}</option>
@@ -50,8 +52,11 @@
                         <div class="form-group" v-if="item.type=='input'">
                             <label :is-required="item.required" class="col-sm-3 control-label no-padding-right">{{item.name}}</label>
                             <div class="col-sm-6">
-                                <input :data-bv-digits="item.validator=='digits'" :data-bv-email="item.validator=='email'" :data-bv-id="item.validator=='id'" :data-bv-integer="item.validator=='integer'"
-                                       :data-bv-numeric="item.validator=='numeric'" :data-bv-phone="item.validator=='phone'"
+                                <input :data-bv-digits="item.validator=='digits'"
+                                       :data-bv-email="item.validator=='email'" :data-bv-id="item.validator=='id'"
+                                       :data-bv-integer="item.validator=='integer'"
+                                       :data-bv-numeric="item.validator=='numeric'"
+                                       :data-bv-phone="item.validator=='phone'"
                                        :data-bv-uri="item.validator=='uri'" :disabled="item.disabled"
                                        :max="item.max"
                                        :min="item.min"
@@ -59,16 +64,17 @@
                                        :placeholder="item.placeholder"
                                        :required="item.required" class="form-control"
                                        type="text" v-model="config[name]"><span class="input-note" v-html="item.note"
-                                                                             v-if="item.note"></span>
+                                                                                v-if="item.note"></span>
                             </div>
                         </div>
                         <div class="form-group" v-if="item.type=='textarea'">
                             <label :is-required="item.required" class="col-sm-3 control-label no-padding-right">{{item.name}}</label>
                             <div class="col-sm-6">
-                                <textarea :disabled="item.disabled" :name="name" :placeholder="item.placeholder" :required="item.required"
+                                <textarea :disabled="item.disabled" :name="name" :placeholder="item.placeholder"
+                                          :required="item.required"
                                           class="form-control" rows="5"
                                           v-model="config[name]"></textarea><span class="input-note" v-html="item.note"
-                                                                                     v-if="item.note"></span>
+                                                                                  v-if="item.note"></span>
                             </div>
                         </div>
                         <div class="form-group" v-if="item.type=='select'">
@@ -145,10 +151,10 @@
         <script>
             var info = {$info | json_encode | raw
             }
-            ;
+
             var typeList = {$typeList | json_encode | raw
             }
-            ;
+
             new Vue({
                 el: '#app',
                 data: {

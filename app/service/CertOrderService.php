@@ -4,6 +4,7 @@ namespace app\service;
 
 use app\lib\CertHelper;
 use app\utils\CertDnsUtils;
+use app\utils\DnsQueryUtils;
 use Exception;
 use think\facade\Db;
 
@@ -322,9 +323,9 @@ class CertOrderService
         $row = Db::name('cert_cname')->alias('A')->join('domain B', 'A.did = B.id')->where('A.id', $id)->field('A.*,B.name cnamedomain')->find();
         $domain = '_acme-challenge.' . $row['domain'];
         $record = $row['rr'] . '.' . $row['cnamedomain'];
-        $result = \app\utils\DnsQueryUtils::get_dns_records($domain, 'CNAME');
+        $result = DnsQueryUtils::get_dns_records($domain, 'CNAME');
         if (!$result || !in_array($record, $result)) {
-            $result = \app\utils\DnsQueryUtils::query_dns_doh($domain, 'CNAME');
+            $result = DnsQueryUtils::query_dns_doh($domain, 'CNAME');
             if (!$result || !in_array($record, $result)) {
                 if ($row['status'] == 1) {
                     Db::name('cert_cname')->where('id', $id)->update(['status' => 0]);

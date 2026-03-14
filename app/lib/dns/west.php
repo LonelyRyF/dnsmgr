@@ -3,6 +3,7 @@
 namespace app\lib\dns;
 
 use app\lib\DnsInterface;
+use Exception;
 
 /**
  * @see http://apipost.west.cn/
@@ -66,7 +67,7 @@ class west implements DnsInterface
         $params['token'] = md5($this->username . $this->api_password . $params['time']);
         try {
             $response = http_request($this->baseUrl . $path, http_build_query($params), null, null, null, $this->proxy);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->setError($e->getMessage());
             return false;
         }

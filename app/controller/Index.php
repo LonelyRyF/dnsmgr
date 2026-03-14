@@ -3,6 +3,8 @@
 namespace app\controller;
 
 use app\BaseController;
+use app\lib\DnsHelper;
+use app\lib\TOTP;
 use Exception;
 use think\facade\Cache;
 use think\facade\Db;
@@ -90,11 +92,11 @@ class Index extends BaseController
         if (Db::name('account')->count() > 0 && Db::name('account')->whereNotNull('config')->count() == 0) {
             $accounts = Db::name('account')->select();
             foreach ($accounts as $account) {
-                if (!empty($account['config']) || !isset(\app\lib\DnsHelper::$dns_config[$account['type']])) continue;
+                if (!empty($account['config']) || !isset(DnsHelper::$dns_config[$account['type']])) continue;
                 $config = [];
                 $account_fields = ['name', 'sk', 'ext'];
                 $i = 0;
-                foreach (\app\lib\DnsHelper::$dns_config[$account['type']]['config'] as $field => $item) {
+                foreach (DnsHelper::$dns_config[$account['type']]['config'] as $field => $item) {
                     if ($field == 'proxy') {
                         $config[$field] = $account['proxy'];
                         break;
@@ -168,7 +170,7 @@ class Index extends BaseController
         $action = input('param.action');
         if ($action == 'generate') {
             try {
-                $totp = \app\lib\TOTP::create();
+                $totp = TOTP::create();
                 $totp->setLabel($this->request->user['username']);
                 $totp->setIssuer('DNS Manager');
                 return json(['code' => 0, 'data' => ['secret' => $totp->getSecret(), 'qrcode' => $totp->getProvisioningUri()]]);
@@ -181,7 +183,7 @@ class Index extends BaseController
             if (empty($secret)) return json(['code' => -1, 'msg' => '密钥不能为空']);
             if (empty($code)) return json(['code' => -1, 'msg' => '请输入动态口令']);
             try {
-                $totp = \app\lib\TOTP::create($secret);
+                $totp = TOTP::create($secret);
                 if (!$totp->verify($code)) {
                     return json(['code' => -1, 'msg' => '动态口令错误']);
                 }

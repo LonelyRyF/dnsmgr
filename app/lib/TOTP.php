@@ -2,6 +2,11 @@
 
 namespace app\lib;
 
+use Exception;
+use InvalidArgumentException;
+use function chr;
+use function count;
+
 class TOTP
 {
     private static $BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
@@ -75,7 +80,7 @@ class TOTP
     {
         $timestamp = $timestamp ?? time();
         if ($timestamp < 0) {
-            throw new \InvalidArgumentException('Timestamp must be at least 0.');
+            throw new InvalidArgumentException('Timestamp must be at least 0.');
         }
 
         return $timestamp;
@@ -100,7 +105,7 @@ class TOTP
 
         $hmac = array_values(unpack('C*', $hash));
 
-        $offset = ($hmac[\count($hmac) - 1] & 0xF);
+        $offset = ($hmac[count($hmac) - 1] & 0xF);
         $code = ($hmac[$offset + 0] & 0x7F) << 24 | ($hmac[$offset + 1] & 0xFF) << 16 | ($hmac[$offset + 2] & 0xFF) << 8 | ($hmac[$offset + 3] & 0xFF);
         $otp = $code % (10 ** $this->digits);
 
@@ -111,7 +116,7 @@ class TOTP
     {
         $result = [];
         while (0 !== $int) {
-            $result[] = \chr($int & 0xFF);
+            $result[] = chr($int & 0xFF);
             $int >>= 8;
         }
 
@@ -130,7 +135,7 @@ class TOTP
             $c = $data[$i];
             $b = strpos(self::$BASE32_ALPHABET, $c);
             if ($b === false) {
-                throw new \Exception('Encoded string is invalid, it contains unknown char #' . ord($c));
+                throw new Exception('Encoded string is invalid, it contains unknown char #' . ord($c));
             }
             $buf = ($buf << 5) | $b;
             $bufSize += 5;
@@ -183,10 +188,10 @@ class TOTP
         }
         $label = $this->getLabel();
         if (null === $label) {
-            throw new \InvalidArgumentException('The label is not set.');
+            throw new InvalidArgumentException('The label is not set.');
         }
         if ($this->hasColon($label)) {
-            throw new \InvalidArgumentException('Label must not contain a colon.');
+            throw new InvalidArgumentException('Label must not contain a colon.');
         }
         $params['issuer'] = $this->getIssuer();
         $params['secret'] = $this->getSecret();

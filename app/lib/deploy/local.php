@@ -2,6 +2,7 @@
 
 namespace app\lib\deploy;
 
+use app\lib\CertHelper;
 use app\lib\DeployInterface;
 use Exception;
 
@@ -42,7 +43,7 @@ class local implements DeployInterface
             if (!is_dir($dir)) throw new Exception($dir . ' 目录不存在');
             if (!is_writable($dir)) throw new Exception($dir . ' 目录不可写');
 
-            $pfx = \app\lib\CertHelper::getPfx($fullchain, $privatekey, $config['pfx_pass'] ? $config['pfx_pass'] : null);
+            $pfx = CertHelper::getPfx($fullchain, $privatekey, $config['pfx_pass'] ? $config['pfx_pass'] : null);
             if (file_put_contents($config['pfx_file'], $pfx)) {
                 $this->log('PFX证书已保存到：' . $config['pfx_file']);
             } else {

@@ -3,6 +3,7 @@
 namespace app\lib\client;
 
 use Exception;
+use SimpleXMLElement;
 
 class AliyunOSS
 {
@@ -51,7 +52,7 @@ class AliyunOSS
         <BucketCnameConfiguration>
         </BucketCnameConfiguration>
         EOF;
-        $xml = new \SimpleXMLElement($strXml);
+        $xml = new SimpleXMLElement($strXml);
         $node = $xml->addChild('Cname');
         $node->addChild('Domain', $domain);
         $certNode = $node->addChild('CertificateConfiguration');
@@ -234,7 +235,7 @@ class AliyunOSS
         <BucketCnameConfiguration>
         </BucketCnameConfiguration>
         EOF;
-        $xml = new \SimpleXMLElement($strXml);
+        $xml = new SimpleXMLElement($strXml);
         $node = $xml->addChild('Cname');
         $node->addChild('Domain', $domain);
         $certNode = $node->addChild('CertificateConfiguration');

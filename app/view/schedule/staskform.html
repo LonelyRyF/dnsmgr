@@ -98,7 +98,8 @@
                                     <option value="6">六</option>
                                 </select>
                                 <input class="form-control" max="31" min="1" name="switchdate"
-                                       placeholder="日期1~31" required type="number" v-model="set.switchdate" v-show="set.cycle==2">
+                                       placeholder="日期1~31" required type="number" v-model="set.switchdate"
+                                       v-show="set.cycle==2">
                                 <span class="input-group-addon"></span>
                                 <input class="form-control" name="switchtime" required type="time"
                                        v-model="set.switchtime">
@@ -170,10 +171,10 @@
             var action = '{$action}';
             var info = {$info | json_encode | raw
             }
-            ;
+
             var domainList = {$domains | json_encode | raw
             }
-            ;
+
             new Vue({
                 el: '#app',
                 data: {

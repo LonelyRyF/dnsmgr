@@ -3,9 +3,10 @@ declare (strict_types=1);
 
 namespace app\lib;
 
+use think\Db;
 use think\db\ConnectionInterface;
 
-class NewDbManager extends \think\Db
+class NewDbManager extends Db
 {
     /**
      * 创建数据库连接实例

@@ -59,7 +59,8 @@
                     </div>
                     <div class="form-group">
                         <label class="col-sm-3 control-label">收信邮箱</label>
-                        <div class="col-sm-9"><input class="form-control" name="mail_recv" placeholder="不填默认为发信邮箱"
+                        <div class="col-sm-9"><input class="form-control" name="mail_recv"
+                                                     placeholder="不填默认为发信邮箱"
                                                      type="text" value="{:config_get('mail_recv')}"/></div>
                     </div>
                     <div class="form-group">
@@ -95,7 +96,8 @@
                                                      type="text" value="{:config_get('wechat_appuid')}"/></div>
                     </div>
                     <div class="form-group">
-                        <div class="col-sm-offset-3 col-sm-9"><input class="btn btn-primary btn-block" name="submit" type="submit"
+                        <div class="col-sm-offset-3 col-sm-9"><input class="btn btn-primary btn-block" name="submit"
+                                                                     type="submit"
                                                                      value="保存"/></div>
                     </div>
                 </form>
@@ -131,7 +133,8 @@
                     </div>
                     <div class="form-group" id="tgbot_url_div" style="display:none;">
                         <label class="col-sm-3 control-label">自定义反代URL</label>
-                        <div class="col-sm-9"><input class="form-control" name="tgbot_url" placeholder="默认为：https://api.telegram.org"
+                        <div class="col-sm-9"><input class="form-control" name="tgbot_url"
+                                                     placeholder="默认为：https://api.telegram.org"
                                                      type="text"
                                                      value="{:config_get('tgbot_url')}"/></div>
                     </div>

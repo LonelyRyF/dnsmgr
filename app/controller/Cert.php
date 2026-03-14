@@ -7,8 +7,8 @@ use app\lib\CertHelper;
 use app\lib\DeployHelper;
 use app\service\CertDeployService;
 use app\service\CertOrderService;
+use app\utils\DnsQueryUtils;
 use Exception;
-use think\facade\Cache;
 use think\facade\Db;
 use think\facade\View;
 
@@ -943,9 +943,9 @@ class Cert extends BaseController
             $status = 1;
             $domain = '_acme-challenge.' . $row['domain'];
             $record = $row['rr'] . '.' . $row['cnamedomain'];
-            $result = \app\utils\DnsQueryUtils::get_dns_records($domain, 'CNAME');
+            $result = DnsQueryUtils::get_dns_records($domain, 'CNAME');
             if (!$result || !in_array($record, $result)) {
-                $result = \app\utils\DnsQueryUtils::query_dns_doh($domain, 'CNAME');
+                $result = DnsQueryUtils::query_dns_doh($domain, 'CNAME');
                 if (!$result || !in_array($record, $result)) {
                     $status = 0;
                 }

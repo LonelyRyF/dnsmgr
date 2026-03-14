@@ -84,7 +84,8 @@
                                     <option value="0">否</option>
                                     <option value="1">是</option>
                                 </select>
-                                <a class="input-group-addon" data-content="域名到期提醒，其他设置在“到期提醒设置”里面" data-original-title="说明" data-placement="bottom"
+                                <a class="input-group-addon" data-content="域名到期提醒，其他设置在“到期提醒设置”里面"
+                                   data-original-title="说明" data-placement="bottom"
                                    data-toggle="popover" data-trigger="focus" role="button"
                                    tabindex="0"
                                    title=""><span class="glyphicon glyphicon-info-sign"></span></a>
@@ -99,7 +100,8 @@
                                     <option value="0">否</option>
                                     <option value="1">是</option>
                                 </select>
-                                <a class="input-group-addon" data-content="隐藏后仅管理员可见，普通用户在列表不可见" data-original-title="说明" data-placement="bottom"
+                                <a class="input-group-addon" data-content="隐藏后仅管理员可见，普通用户在列表不可见"
+                                   data-original-title="说明" data-placement="bottom"
                                    data-toggle="popover" data-trigger="focus" role="button"
                                    tabindex="0"
                                    title=""><span class="glyphicon glyphicon-info-sign"></span></a>
@@ -114,7 +116,9 @@
                                     <option value="0">否</option>
                                     <option value="1">是</option>
                                 </select>
-                                <a class="input-group-addon" data-content="对接开关开启后，将允许通过API接口一键登录该域名独立管理面板" data-original-title="说明" data-placement="bottom"
+                                <a class="input-group-addon"
+                                   data-content="对接开关开启后，将允许通过API接口一键登录该域名独立管理面板"
+                                   data-original-title="说明" data-placement="bottom"
                                    data-toggle="popover" data-trigger="focus" role="button"
                                    tabindex="0"
                                    title=""><span class="glyphicon glyphicon-info-sign"></span></a>
@@ -559,15 +563,15 @@
         })
         if (action == 'editremark') {
             batch_edit_remark(ids)
-            return;
+
         } else if (action == 'addrecord') {
             sessionStorage.setItem('domains', JSON.stringify(rows));
             window.location.href = '/record/batchadd';
-            return;
+
         } else if (action == 'editrecord') {
             sessionStorage.setItem('domains', JSON.stringify(rows));
             window.location.href = '/record/batchedit';
-            return;
+
         } else if (action == 'delete') {
             layer.confirm('确定要删除所选域名吗？', {title: '提示', icon: 0}, function () {
                 var ii = layer.load(2);

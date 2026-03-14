@@ -3,6 +3,7 @@
 namespace app\lib\deploy;
 
 use app\lib\DeployInterface;
+use DateTime;
 use Exception;
 
 class synology implements DeployInterface
@@ -84,7 +85,7 @@ class synology implements DeployInterface
         foreach ($result['data']['certificates'] as $certificate) {
             if ($certificate['subject']['common_name'] == $certInfo['subject']['CN'] || $certificate['desc'] == $config['desc']) {
                 $id = $certificate['id'];
-                $validFrom = \DateTime::createFromFormat('M d H:i:s Y T', $certificate['valid_from'])->getTimestamp();
+                $validFrom = DateTime::createFromFormat('M d H:i:s Y T', $certificate['valid_from'])->getTimestamp();
                 break;
             }
         }

@@ -4,11 +4,12 @@ declare (strict_types=1);
 
 namespace app\middleware;
 
+use Closure;
 use think\facade\Db;
 
 class AuthApi
 {
-    public function handle($request, \Closure $next)
+    public function handle($request, Closure $next)
     {
         $uid = input('post.uid/d');
         $timestamp = input('post.timestamp');

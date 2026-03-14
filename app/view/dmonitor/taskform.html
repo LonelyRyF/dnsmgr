@@ -104,7 +104,8 @@
                         <label class="col-sm-3 control-label no-padding-right" is-required>TCP检测端口</label>
                         <div class="col-sm-6">
                             <input class="form-control" data-bv-integer="true" max="65535" min="1"
-                                   name="tcpport" placeholder="填写TCP端口号" required type="text" v-model="set.tcpport">
+                                   name="tcpport" placeholder="填写TCP端口号" required type="text"
+                                   v-model="set.tcpport">
                         </div>
                     </div>
                     <div class="form-group" v-show="set.type<=2&&set.checktype==2">
@@ -139,7 +140,9 @@
                     </div>
                     <div class="form-group" v-show="set.type==3">
                         <label class="col-sm-3 control-label no-padding-right" is-required>同域名正常数量<span
-                                class="tips" data-original-title="与暂停解析配合使用，当同域名正常记录数量&lt;=几条时开启解析" data-placement="bottom" data-toggle="tooltip"
+                                class="tips"
+                                data-original-title="与暂停解析配合使用，当同域名正常记录数量&lt;=几条时开启解析"
+                                data-placement="bottom" data-toggle="tooltip"
                                 title=""><i
                                 class="fa fa-question-circle"></i></span></label>
                         <div class="col-sm-3">
@@ -190,10 +193,10 @@
             var action = '{$action}';
             var info = {$info | json_encode | raw
             }
-            ;
+
             var domainList = {$domains | json_encode | raw
             }
-            ;
+
             var support_ping = '{$support_ping}';
             new Vue({
                 el: '#app',

@@ -3,6 +3,7 @@
 namespace app\lib\client;
 
 use Exception;
+use SimpleXMLElement;
 
 /**
  * 华为云OBS
@@ -31,7 +32,7 @@ class HuaweiOBS
         <CustomDomainConfiguration>
         </CustomDomainConfiguration>
         EOF;
-        $xml = new \SimpleXMLElement($strXml);
+        $xml = new SimpleXMLElement($strXml);
         $xml->addChild('Name', $cert_name);
         $xml->addChild('Certificate', $fullchain);
         $xml->addChild('PrivateKey', $privatekey);

@@ -61,7 +61,7 @@
                         rel="noreferrer" target="_blank">谷歌身份验证器</a>、<a
                         href="https://www.microsoft.com/zh-cn/security/mobile-authenticator-app" rel="noreferrer"
                         target="_blank">微软身份验证器</a>、<a href="https://github.com/freeotp" rel="noreferrer"
-                                                               target="_blank">FreeOTP</a></p>
+                                                              target="_blank">FreeOTP</a></p>
             </div>
         </div>
         <div aria-hidden="true" class="modal" data-backdrop="static" data-keyboard="false" id="modal-totp">
@@ -76,13 +76,15 @@
                     <div class="modal-body text-center">
                         <p>使用支持TOTP的认证软件扫描以下二维码</p>
                         <div class="qr-image mt-4" id="qrcode"></div>
-                        <p><a data-clipboard-text="" href="javascript:;" id="copy-btn">复制密钥</a></p>
+                        <p><a data-clipboard-text="" href="javascript:" id="copy-btn">复制密钥</a></p>
                         <form id="form-totp" onsubmit="return bind_totp()" style="text-align: left;">
                             <div class="form-group mt-4">
-                                <div class="input-group"><input autocomplete="off" class="form-control input-lg" id="code"
+                                <div class="input-group"><input autocomplete="off" class="form-control input-lg"
+                                                                id="code"
                                                                 name="code" placeholder="填写动态口令" required
                                                                 type="number" value="">
-                                    <div class="input-group-btn"><input class="btn btn-success btn-lg btn-block" name="submit" type="submit"
+                                    <div class="input-group-btn"><input class="btn btn-success btn-lg btn-block"
+                                                                        name="submit" type="submit"
                                                                         value="完成绑定"/></div>
                                 </div>
                             </div>

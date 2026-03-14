@@ -4,7 +4,9 @@ namespace app\lib\cert;
 
 use app\lib\CertInterface;
 use app\lib\client\TencentCloud;
+use app\utils\CertDnsUtils;
 use Exception;
+use ZipArchive;
 
 class tencent implements CertInterface
 {
@@ -134,7 +136,7 @@ class tencent implements CertInterface
         $file_name = substr($data['DownloadFilename'], 0, -4);
         file_put_contents($file_path, $file_data);
 
-        $zip = new \ZipArchive;
+        $zip = new ZipArchive;
         if ($zip->open($file_path) === true) {
             $zip->extractTo(app()->getRuntimePath() . 'cert/');
             $zip->close();
@@ -180,7 +182,7 @@ class tencent implements CertInterface
                 $name = substr($opts['DomainValidateAuthKey'], 0, -(strlen($mainDomain) + 1));
                 $dnsList[$mainDomain][] = ['name' => $name, 'type' => 'TXT', 'value' => $opts['DomainValidateAuthValue']];
             }
-            \app\utils\CertDnsUtils::addDns($dnsList, function ($txt) {
+            CertDnsUtils::addDns($dnsList, function ($txt) {
                 $this->log($txt);
             });
         }

@@ -4,7 +4,6 @@ namespace app\controller;
 
 use app\BaseController;
 use think\facade\Db;
-use think\facade\Request;
 use think\facade\View;
 
 class User extends BaseController

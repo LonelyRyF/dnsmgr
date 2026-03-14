@@ -3,6 +3,7 @@
 namespace app\lib\mail;
 
 use app\lib\client\Aliyun as AliyunClient;
+use Exception;
 
 class Aliyun
 {
@@ -35,7 +36,7 @@ class Aliyun
         try {
             $this->client->request($param);
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $e->getMessage();
         }
     }

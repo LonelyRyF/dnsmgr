@@ -33,7 +33,8 @@
                     <div class="form-group">
                         <label class="col-sm-3 control-label">部署任务运行时段（小时）</label>
                         <div class="col-sm-9">
-                            <div class="input-group"><select class="form-control" default="{:config_get('deploy_hour_start', '0')}"
+                            <div class="input-group"><select class="form-control"
+                                                             default="{:config_get('deploy_hour_start', '0')}"
                                                              name="deploy_hour_start">{for
                                 start="0" end="24"}
                                 <option value="{$i}">{$i}</option>
@@ -87,7 +88,8 @@
                     </div>
                     <div class="form-group">
                         <label class="col-sm-3 control-label">群机器人Webhook</label>
-                        <div class="col-sm-9"><select class="form-control" default="{:config_get('cert_notice_webhook')}"
+                        <div class="col-sm-9"><select class="form-control"
+                                                      default="{:config_get('cert_notice_webhook')}"
                                                       name="cert_notice_webhook">
                             <option value="0">关闭</option>
                             <option value="1">开启</option>
@@ -95,7 +97,8 @@
                         </select></div>
                     </div>
                     <div class="form-group">
-                        <div class="col-sm-offset-3 col-sm-9"><input class="btn btn-primary btn-block" name="submit" type="submit"
+                        <div class="col-sm-offset-3 col-sm-9"><input class="btn btn-primary btn-block" name="submit"
+                                                                     type="submit"
                                                                      value="保存"/></div>
                     </div>
                 </form>

@@ -3,6 +3,7 @@
 namespace app\lib\dns;
 
 use app\lib\DnsInterface;
+use Exception;
 
 class cloudflare implements DnsInterface
 {
@@ -89,7 +90,7 @@ class cloudflare implements DnsInterface
 
         try {
             $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->setError($e->getMessage());
             return false;
         }

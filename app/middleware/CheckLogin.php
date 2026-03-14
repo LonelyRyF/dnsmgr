@@ -4,9 +4,11 @@ declare (strict_types=1);
 
 namespace app\middleware;
 
+use Closure;
+
 class CheckLogin
 {
-    public function handle($request, \Closure $next)
+    public function handle($request, Closure $next)
     {
         if (!$request->islogin) {
             if ($request->isAjax() || !$request->isGet()) {

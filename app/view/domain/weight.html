@@ -35,7 +35,8 @@
                         <label class="col-sm-3 control-label no-padding-right">线路权重开关</label>
                         <div class="col-sm-9">
                             <div class="material-switch" style="padding-top:7px"><input checked id="weight-switch"
-                                                                                        name="status" onchange="changeOpen()"
+                                                                                        name="status"
+                                                                                        onchange="changeOpen()"
                                                                                         type="checkbox"
                                                                                         value="1"/><label
                                     class="label-primary" for="weight-switch"></label></div>
@@ -102,10 +103,10 @@
 <script>
     var dnsconfig = {$dnsconfig | json_encode | raw
     }
-    ;
+
     var recordLine = {$recordLine | json_encode | raw
     }
-    ;
+
     var domainId = {$domainId};
     var weightList = [];
     var lineList = [];

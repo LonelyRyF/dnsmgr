@@ -5,6 +5,7 @@ namespace app\lib\deploy;
 use app\lib\client\AWS as AWSClient;
 use app\lib\DeployInterface;
 use Exception;
+use SimpleXMLElement;
 
 class aws implements DeployInterface
 {
@@ -138,7 +139,7 @@ class aws implements DeployInterface
         unset($data['ViewerCertificate']['Certificate']);
         unset($data['ViewerCertificate']['CertificateSource']);
 
-        $xml = new \SimpleXMLElement('<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2020-05-31/"></DistributionConfig>');
+        $xml = new SimpleXMLElement('<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2020-05-31/"></DistributionConfig>');
         $client->requestXmlN('PUT', '/distribution/' . $config['distribution_id'] . '/config', $data, $xml);
         $this->log('分配ID: ' . $config['distribution_id'] . ' 证书部署成功！');
     }

@@ -7,9 +7,9 @@ use app\service\CertTaskService;
 use app\service\ExpireNoticeService;
 use app\service\OptimizeService;
 use app\service\ScheduleService;
+use app\utils\MsgNotice;
 use Exception;
 use think\facade\Cache;
-use think\facade\Db;
 use think\facade\View;
 
 class System extends BaseController
@@ -55,7 +55,7 @@ class System extends BaseController
         if (!checkPermission(2)) return $this->alert('error', '无权限');
         $mail_name = config_get('mail_recv') ? config_get('mail_recv') : config_get('mail_name');
         if (empty($mail_name)) return json(['code' => -1, 'msg' => '您还未设置邮箱！']);
-        $result = \app\utils\MsgNotice::send_mail($mail_name, '邮件发送测试。', '这是一封测试邮件！<br/><br/>来自：' . $this->request->root(true));
+        $result = MsgNotice::send_mail($mail_name, '邮件发送测试。', '这是一封测试邮件！<br/><br/>来自：' . $this->request->root(true));
         if ($result === true) {
             return json(['code' => 0, 'msg' => '邮件发送成功！']);
         } else {
@@ -70,7 +70,7 @@ class System extends BaseController
         $tgbot_chatid = config_get('tgbot_chatid');
         if (empty($tgbot_token) || empty($tgbot_chatid)) return json(['code' => -1, 'msg' => '请先保存设置']);
         $content = "<strong>消息发送测试</strong>\n\n这是一封测试消息！\n\n来自：" . $this->request->root(true);
-        $result = \app\utils\MsgNotice::send_telegram_bot($content);
+        $result = MsgNotice::send_telegram_bot($content);
         if ($result === true) {
             return json(['code' => 0, 'msg' => '消息发送成功！']);
         } else {
@@ -84,7 +84,7 @@ class System extends BaseController
         $webhook_url = config_get('webhook_url');
         if (empty($webhook_url)) return json(['code' => -1, 'msg' => '请先保存设置']);
         $content = "这是一封测试消息！\n来自：" . $this->request->root(true);
-        $result = \app\utils\MsgNotice::send_webhook('消息发送测试', $content);
+        $result = MsgNotice::send_webhook('消息发送测试', $content);
         if ($result === true) {
             return json(['code' => 0, 'msg' => '消息发送成功！']);
         } else {

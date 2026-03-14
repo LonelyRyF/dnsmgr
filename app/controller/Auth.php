@@ -3,6 +3,7 @@
 namespace app\controller;
 
 use app\BaseController;
+use app\lib\TOTP;
 use Exception;
 use think\facade\Db;
 
@@ -95,7 +96,7 @@ class Auth extends BaseController
         if (!$user) return json(['code' => -1, 'msg' => '用户不存在']);
         if ($user['totp_open'] == 0 || empty($user['totp_secret'])) return json(['code' => -1, 'msg' => '未开启TOTP二次验证']);
         try {
-            $totp = \app\lib\TOTP::create($user['totp_secret']);
+            $totp = TOTP::create($user['totp_secret']);
             if (!$totp->verify($code)) {
                 return json(['code' => -1, 'msg' => '动态口令错误']);
             }

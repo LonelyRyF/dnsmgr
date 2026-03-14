@@ -5,6 +5,7 @@ namespace app\lib\cert;
 use app\lib\CertInterface;
 use app\lib\client\Ucloud as UcloudClient;
 use Exception;
+use ZipArchive;
 
 class ucloud implements CertInterface
 {
@@ -134,7 +135,7 @@ class ucloud implements CertInterface
         $file_path = app()->getRuntimePath() . 'cert/USSL_' . $order['CertificateID'] . '.zip';
         file_put_contents($file_path, $file_data);
 
-        $zip = new \ZipArchive;
+        $zip = new ZipArchive;
         if ($zip->open($file_path) === true) {
             $zip->extractTo(app()->getRuntimePath() . 'cert/');
             $zip->close();

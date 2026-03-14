@@ -3,6 +3,7 @@
 namespace app\lib\dns;
 
 use app\lib\DnsInterface;
+use Exception;
 
 class qingcloud implements DnsInterface
 {
@@ -104,7 +105,7 @@ class qingcloud implements DnsInterface
         $url = $this->baseUrl . $path;
         try {
             $response = http_request($url, $body, null, null, $header, $this->proxy, $method);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->setError($e->getMessage());
             return false;
         }

@@ -4,24 +4,28 @@ declare (strict_types=1);
 
 namespace app\middleware;
 
+use Closure;
 use Exception;
 use think\facade\Cache;
 use think\facade\Config;
 use think\facade\Db;
+use think\Request;
+use think\Response;
 
 class LoadConfig
 {
     /**
      * 处理请求
      *
-     * @param \think\Request $request
-     * @param \Closure $next
+     * @param Request $request
+     * @param Closure $next
      * @return Response
+     * @throws Exception
      */
-    public function handle($request, \Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         if (!file_exists(app()->getRootPath() . '.env')) {
-            if (strpos($request->url(), '/install') === false) {
+            if (!str_contains($request->url(), '/install')) {
                 return redirect((string)url('/install'))->header([
                     'Cache-Control' => 'no-store, no-cache, must-revalidate',
                     'Pragma' => 'no-cache',
@@ -31,7 +35,7 @@ class LoadConfig
             }
         }
         if (!checkTableExists('config') && !checkTableExists('user')) {
-            if (strpos($request->url(), '/install') === false) {
+            if (!str_contains($request->url(), '/install')) {
                 return redirect((string)url('/install'))->header([
                     'Cache-Control' => 'no-store, no-cache, must-revalidate',
                     'Pragma' => 'no-cache',

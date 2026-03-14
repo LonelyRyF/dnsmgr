@@ -4,6 +4,9 @@ namespace app\utils;
 
 use app\lib\CertHelper;
 use app\lib\DeployHelper;
+use app\lib\mail\Aliyun;
+use app\lib\mail\Sendcloud;
+use Exception;
 use PHPMailer\PHPMailer\PHPMailer;
 use think\facade\Db;
 
@@ -68,10 +71,10 @@ class MsgNotice
     {
         $mail_type = config_get('mail_type');
         if ($mail_type == 1) {
-            $mail = new \app\lib\mail\Sendcloud(config_get('mail_apiuser'), config_get('mail_apikey'));
+            $mail = new Sendcloud(config_get('mail_apiuser'), config_get('mail_apikey'));
             return $mail->send($to, $sub, $msg, config_get('mail_name'), self::$sitename);
         } elseif ($mail_type == 2) {
-            $mail = new \app\lib\mail\Aliyun(config_get('mail_apiuser'), config_get('mail_apikey'));
+            $mail = new Aliyun(config_get('mail_apiuser'), config_get('mail_apikey'));
             return $mail->send($to, $sub, $msg, config_get('mail_name'), self::$sitename);
         } else {
             $mail_name = config_get('mail_name');
@@ -102,7 +105,7 @@ class MsgNotice
                 $mail->Body = $msg;
                 $mail->send();
                 return true;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return $mail->ErrorInfo;
             }
         }

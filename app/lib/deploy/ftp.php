@@ -2,6 +2,7 @@
 
 namespace app\lib\deploy;
 
+use app\lib\CertHelper;
 use app\lib\DeployInterface;
 use Exception;
 
@@ -82,7 +83,7 @@ class ftp implements DeployInterface
             }
             fclose($temp_stream);
         } elseif ($config['format'] == 'pfx') {
-            $pfx = \app\lib\CertHelper::getPfx($fullchain, $privatekey, $config['pfx_pass'] ? $config['pfx_pass'] : null);
+            $pfx = CertHelper::getPfx($fullchain, $privatekey, $config['pfx_pass'] ? $config['pfx_pass'] : null);
 
             $temp_stream = fopen('php://temp', 'r+');
             fwrite($temp_stream, $pfx);

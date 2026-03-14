@@ -3,6 +3,7 @@
 namespace app\lib\dns;
 
 use app\lib\DnsInterface;
+use Exception;
 
 /**
  * @see https://docs.spaceship.dev/
@@ -76,7 +77,7 @@ class spaceship implements DnsInterface
         }
         try {
             $response = http_request($url, $body, null, null, $headers, $this->proxy, $method);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->setError($e->getMessage());
             return false;
         }

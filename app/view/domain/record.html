@@ -77,7 +77,8 @@
                     <div class="form-group">
                         <label class="col-sm-3 control-label no-padding-right">TTL</label>
                         <div class="col-sm-9">
-                            <input class="form-control" min="{$minTTL}" name="ttl" placeholder="指解析结果在DNS服务器中的缓存时间"
+                            <input class="form-control" min="{$minTTL}" name="ttl"
+                                   placeholder="指解析结果在DNS服务器中的缓存时间"
                                    required type="text" value="600">
                         </div>
                     </div>
@@ -192,9 +193,10 @@
     <div class="col-xs-12 center-block" style="float: none;">
         <div class="panel panel-default">
             <div class="panel-heading">
-                <h3 class="panel-title">{if request()->user['type'] eq 'user'}<a class="btn btn-sm btn-default pull-right"
-                                                                                 href="/domain"
-                                                                                 style="margin-top:-6px"><i
+                <h3 class="panel-title">{if request()->user['type'] eq 'user'}<a
+                        class="btn btn-sm btn-default pull-right"
+                        href="/domain"
+                        style="margin-top:-6px"><i
                         class="fa fa-reply fa-fw"></i> 返回</a>{/if}{$domainName}</h3>
             </div>
             <div class="panel-body">
@@ -305,10 +307,10 @@
 <script>
     var recordLine = {$recordLine | json_encode | raw
     }
-    ;
+
     var dnsconfig = {$dnsconfig | json_encode | raw
     }
-    ;
+
     var defaultLine = recordLine[0].id;
     var sidePagination = dnsconfig.page ? 'client' : 'server';
     var showWeight = dnsconfig.weight;

@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace app\command;
 
 use app\service\TaskRunner;
+use Co;
 use Exception;
+use Swoole\ExitException;
 use think\console\Command;
 use think\console\Input;
-use think\console\input\Argument;
-use think\console\input\Option;
 use think\console\Output;
 use think\facade\Config;
 use think\facade\Db;
+use function Co\run;
+use function go;
 
 class Dmtask extends Command
 {
@@ -45,8 +47,8 @@ class Dmtask extends Command
 
     private function runtask()
     {
-        \Co::set(['hook_flags' => SWOOLE_HOOK_ALL]);
-        \Co\run(function () {
+        Co::set(['hook_flags' => SWOOLE_HOOK_ALL]);
+        run(function () {
             $date = date("Ymd");
             $count = config_get('run_count', null, true) ?? 0;
             while (true) {
@@ -58,10 +60,10 @@ class Dmtask extends Command
 
                 $rows = Db::name('dmtask')->where('checknexttime', '<=', time())->where('active', 1)->order('id', 'ASC')->select();
                 foreach ($rows as $row) {
-                    \go(function () use ($row) {
+                    go(function () use ($row) {
                         try {
                             (new TaskRunner())->execute($row);
-                        } catch (\Swoole\ExitException $e) {
+                        } catch (ExitException $e) {
                             echo $e->getStatus() . "\n";
                         } catch (Exception $e) {
                             echo $e->__toString() . "\n";

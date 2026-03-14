@@ -132,7 +132,7 @@
                         <div class="col-sm-6">
                             <div class="form-control-static">
                                 {{ typeList[set.type].name }}
-                                <a @click="selectedType = false" class="pull-right btn btn-default" href="javascript:;"
+                                <a @click="selectedType = false" class="pull-right btn btn-default" href="javascript:"
                                    v-if="action=='add'">重新选择</a>
                             </div>
                             <input name="type" type="hidden" v-model="set.type">
@@ -142,8 +142,11 @@
                         <div class="form-group" v-if="item.type=='input'">
                             <label :is-required="item.required" class="col-sm-3 control-label no-padding-right">{{item.name}}</label>
                             <div class="col-sm-6">
-                                <input :data-bv-digits="item.validator=='digits'" :data-bv-email="item.validator=='email'" :data-bv-id="item.validator=='id'" :data-bv-integer="item.validator=='integer'"
-                                       :data-bv-numeric="item.validator=='numeric'" :data-bv-phone="item.validator=='phone'"
+                                <input :data-bv-digits="item.validator=='digits'"
+                                       :data-bv-email="item.validator=='email'" :data-bv-id="item.validator=='id'"
+                                       :data-bv-integer="item.validator=='integer'"
+                                       :data-bv-numeric="item.validator=='numeric'"
+                                       :data-bv-phone="item.validator=='phone'"
                                        :data-bv-uri="item.validator=='uri'" :disabled="item.disabled"
                                        :max="item.max"
                                        :min="item.min"
@@ -151,7 +154,7 @@
                                        :placeholder="item.placeholder"
                                        :required="item.required" class="form-control"
                                        type="text" v-model="config[name]"><span class="input-note" v-html="item.note"
-                                                                             v-if="item.note"></span>
+                                                                                v-if="item.note"></span>
                             </div>
                         </div>
                         <div class="form-group" v-if="item.type=='textarea'">
@@ -160,7 +163,7 @@
                                 <textarea :disabled="item.disabled" :name="name" :placeholder="item.placeholder"
                                           :required="item.required" class="form-control"
                                           v-model="config[name]"></textarea><span class="input-note" v-html="item.note"
-                                                                                     v-if="item.note"></span>
+                                                                                  v-if="item.note"></span>
                             </div>
                         </div>
                         <div class="form-group" v-if="item.type=='select'">
@@ -235,13 +238,13 @@
         <script>
             var info = {$info | json_encode | raw
             }
-            ;
+
             var typeList = {$typeList | json_encode | raw
             }
-            ;
+
             var classList = {$classList | json_encode | raw
             }
-            ;
+
             new Vue({
                 el: '#app',
                 data: {

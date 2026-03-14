@@ -35,7 +35,9 @@
                                     <option value="{$k}">{$v}</option>
                                     {/foreach}
                                 </select>
-                                <a class="input-group-addon" data-content="不支持对CloudFlare里的域名添加优选，必须使用其他DNS服务商。" data-original-title="说明" data-placement="bottom"
+                                <a class="input-group-addon"
+                                   data-content="不支持对CloudFlare里的域名添加优选，必须使用其他DNS服务商。"
+                                   data-original-title="说明" data-placement="bottom"
                                    data-toggle="popover" data-trigger="focus" role="button"
                                    tabindex="0"
                                    title=""><span class="glyphicon glyphicon-info-sign"></span></a>
@@ -56,25 +58,29 @@
                             <label class="radio-inline">
                                 <input name="type" type="radio" v-model="set.type" value="0"> 电信/联通/移动线路<span
                                     class="tips" data-original-title="" data-placement="bottom"
-                                    data-toggle="tooltip" title="用于已在CF添加，需优化三网访问速度的域名"><i class="fa fa-question-circle"></i></span>
+                                    data-toggle="tooltip" title="用于已在CF添加，需优化三网访问速度的域名"><i
+                                    class="fa fa-question-circle"></i></span>
                             </label>
                             <label class="radio-inline">
                                 <input name="type" type="radio" v-model="set.type" value="1"> 默认/联通/移动线路<span
                                     class="tips" data-original-title=""
-                                    data-placement="bottom" data-toggle="tooltip" title="将电信优选IP解析到默认线路，用于给其他域名提供CNAME服务"><i
+                                    data-placement="bottom" data-toggle="tooltip"
+                                    title="将电信优选IP解析到默认线路，用于给其他域名提供CNAME服务"><i
                                     class="fa fa-question-circle"></i></span>
                             </label>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="col-sm-3 control-label no-padding-right">解析IP类型<span class="tips" data-original-title="同时开启IPv6&IPv4将会请求2次接口消耗双倍积分"
+                        <label class="col-sm-3 control-label no-padding-right">解析IP类型<span class="tips"
+                                                                                               data-original-title="同时开启IPv6&IPv4将会请求2次接口消耗双倍积分"
                                                                                                data-placement="bottom"
                                                                                                data-toggle="tooltip"
                                                                                                title=""><i
                                 class="fa fa-question-circle"></i></span></label>
                         <div class="col-sm-6">
                             <label class="checkbox-inline" v-for="option in iptypeList">
-                                <input :disabled="option.value=='v6' && isXingpingcn" :value="option.value" name="ip_type" required
+                                <input :disabled="option.value=='v6' && isXingpingcn" :value="option.value"
+                                       name="ip_type" required
                                        type="checkbox" v-model="set.ip_type_select"> {{option.label}}<span
                                     class="text-muted"
                                     v-if="option.value=='v6' && isXingpingcn">(xingpingcn.top不支持)</span>
@@ -82,18 +88,21 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="col-sm-3 control-label no-padding-right">每线路解析数量<span class="tips" data-original-title="数量不要超过当前域名套餐允许的最大数量，否则会添加解析失败"
+                        <label class="col-sm-3 control-label no-padding-right">每线路解析数量<span class="tips"
+                                                                                                   data-original-title="数量不要超过当前域名套餐允许的最大数量，否则会添加解析失败"
                                                                                                    data-placement="bottom"
                                                                                                    data-toggle="tooltip"
                                                                                                    title=""><i
                                 class="fa fa-question-circle"></i></span></label>
                         <div class="col-sm-6">
                             <input class="form-control" data-bv-integer="true" max="50" min="1"
-                                   name="recordnum" placeholder="填写每线路解析数量" required type="text" v-model="set.recordnum">
+                                   name="recordnum" placeholder="填写每线路解析数量" required type="text"
+                                   v-model="set.recordnum">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="col-sm-3 control-label no-padding-right">TTL<span class="tips" data-original-title="TTL不要低于当前域名套餐允许的最小值，否则会添加解析失败"
+                        <label class="col-sm-3 control-label no-padding-right">TTL<span class="tips"
+                                                                                        data-original-title="TTL不要低于当前域名套餐允许的最小值，否则会添加解析失败"
                                                                                         data-placement="bottom"
                                                                                         data-toggle="tooltip"
                                                                                         title=""><i
@@ -145,7 +154,7 @@
             var action = '{$action}';
             var info = {$info | json_encode | raw
             }
-            ;
+
             new Vue({
                 el: '#app',
                 data: {

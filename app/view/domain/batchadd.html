@@ -51,7 +51,8 @@
                     <div class="form-group">
                         <label class="col-sm-3 control-label no-padding-right">TTL</label>
                         <div class="col-sm-6">
-                            <input class="form-control" min="{$minTTL}" name="ttl" placeholder="指解析结果在DNS服务器中的缓存时间"
+                            <input class="form-control" min="{$minTTL}" name="ttl"
+                                   placeholder="指解析结果在DNS服务器中的缓存时间"
                                    required type="text" value="600">
                         </div>
                     </div>
@@ -78,10 +79,10 @@
         <script>
             var recordLine = {$recordLine | json_encode | raw
             }
-            ;
+
             var dnsconfig = {$dnsconfig | json_encode | raw
             }
-            ;
+
             var defaultLine = recordLine[0].id;
             $(document).ready(function () {
                 $("select[name=type]").change(function () {
