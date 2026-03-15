@@ -3,3 +3,8 @@
 /vendor
 *.log
 .env
+/frontend/node_modules
+/public/spa
+
+CLAUDE.md
+composer.phar

@@ -150,6 +150,11 @@ Route::group('api', function () {
 
 })->middleware(AuthApi::class);
 
+// SPA Catch-all Route (must be before Route::miss)
+Route::get('/spa/<path d="">', function() {
+    return file_get_contents(public_path() . 'spa/index.html');
+})->pattern(['path' => '.*']);
+
 Route::miss(function () {
     return response('404 Not Found')->code(404);
 });
