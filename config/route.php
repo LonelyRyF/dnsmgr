@@ -42,4 +42,6 @@ return [
     'default_jsonp_handler' => 'jsonpReturn',
     // 默认JSONP处理方法
     'var_jsonp_handler' => 'callback',
+    // 路由定义文件（支持配置多个）
+    'route_config_file' => ['route/app.php', 'route/api.php'],
 ];

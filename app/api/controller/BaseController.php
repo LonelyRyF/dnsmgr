@@ -1,198 +1,134 @@
 <?php
 
+declare(strict_types=1);
+
 namespace app\api\controller;
 
-use app\api\response\ApiResponse;
-use think\exception\ValidateException;
-use think\App;
+use app\BaseController as AppBaseController;
+use app\utils\ApiResponseHelper;
 
 /**
- * API Base Controller
- * Base class for all API controllers with helper methods
+ * API 基础控制器
+ * 所有 API 控制器继承此类
  */
-class BaseController
+class BaseController extends AppBaseController
 {
     /**
-     * Request实例
-     * @var \think\Request
-     */
-    protected $request;
-
-    /**
-     * 应用实例
-     * @var App
-     */
-    protected $app;
-
-    /**
-     * 构造方法
-     * @access public
-     * @param App $app 应用对象
-     */
-    public function __construct(App $app)
-    {
-        $this->app = $app;
-        $this->request = $this->app->request;
-    }
-
-    /**
-     * Get authenticated user
+     * 成功响应
      *
-     * @return array|null
-     */
-    protected function user(): ?array
-    {
-        return $this->request->user ?? null;
-    }
-
-    /**
-     * Check if user is authenticated
-     *
-     * @return bool
-     */
-    protected function isAuthenticated(): bool
-    {
-        return $this->request->islogin ?? false;
-    }
-
-    /**
-     * Validate request data
-     *
-     * @param array $data Data to validate
-     * @param string|array $validate Validate class name or rules
-     * @param string|null $scene Validation scene
-     * @return bool
-     * @throws ValidateException
-     */
-    protected function validate(array $data, $validate, ?string $scene = null): bool
-    {
-        if (is_array($validate)) {
-            $v = new \think\Validate();
-            $v->rule($validate);
-        } else {
-            if (strpos($validate, '.') !== false) {
-                [$validate, $scene] = explode('.', $validate);
-            }
-            $class = str_contains($validate, '\\') ? $validate : 'app\\validate\\' . $validate;
-            $v = new $class();
-            if ($scene) {
-                $v->scene($scene);
-            }
-        }
-
-        if (!$v->check($data)) {
-            throw new ValidateException($v->getError());
-        }
-
-        return true;
-    }
-
-    /**
-     * Validate and return error response on failure
-     *
-     * @param array $data Data to validate
-     * @param string|array $validate Validate class name or rules
-     * @param string|null $scene Validation scene
-     * @return \think\Response|null Returns error response on failure, null on success
-     */
-    protected function validateWithResponse(array $data, $validate, ?string $scene = null): ?\think\Response
-    {
-        try {
-            $this->validate($data, $validate, $scene);
-            return null;
-        } catch (ValidateException $e) {
-            return ApiResponse::validationError($e->getError());
-        }
-    }
-
-    /**
-     * Success response helper
-     *
-     * @param mixed $data Response data
-     * @param string $message Success message
-     * @param int $httpCode HTTP status code
+     * @param mixed $data 响应数据
+     * @param string $message 提示信息
+     * @param int $code HTTP 状态码
      * @return \think\Response
      */
-    protected function success($data = null, string $message = 'Success', int $httpCode = 200): \think\Response
+    protected function success(mixed $data = null, string $message = '操作成功', int $code = 200): \think\Response
     {
-        return ApiResponse::success($data, $message, $httpCode);
+        return ApiResponseHelper::success($data, $message, $code);
     }
 
     /**
-     * Error response helper
+     * 失败响应
      *
-     * @param string $message Error message
-     * @param int $code Error code
-     * @param mixed $errors Detailed errors
-     * @param int $httpCode HTTP status code
+     * @param string $message 错误信息
+     * @param mixed $errors 详细错误信息
+     * @param int $code HTTP 状态码
      * @return \think\Response
      */
-    protected function error(string $message, int $code = -1, $errors = null, int $httpCode = 400): \think\Response
+    protected function error(string $message = '操作失败', mixed $errors = null, int $code = 400): \think\Response
     {
-        return ApiResponse::error($message, $code, $errors, $httpCode);
+        return ApiResponseHelper::error($message, $errors, $code);
     }
 
     /**
-     * Paginated response helper
+     * 分页响应
      *
-     * @param array $items Data items
-     * @param int $total Total count
-     * @param int $page Current page
-     * @param int $limit Items per page
-     * @param string $message Success message
+     * @param array $items 数据列表
+     * @param int $total 总记录数
+     * @param int $page 当前页码
+     * @param int $pageSize 每页数量
+     * @param string $message 提示信息
      * @return \think\Response
      */
-    protected function paginate(array $items, int $total, int $page, int $limit, string $message = 'Success'): \think\Response
+    protected function paginate(array $items, int $total, int $page, int $pageSize, string $message = '获取成功'): \think\Response
     {
-        return ApiResponse::paginate($items, $total, $page, $limit, $message);
+        return ApiResponseHelper::paginate($items, $total, $page, $pageSize, $message);
     }
 
     /**
-     * Check user permission
+     * 创建成功响应（201 Created）
      *
-     * @param string $permission Permission name
-     * @return bool
+     * @param mixed $data 创建的资源数据
+     * @param string $message 提示信息
+     * @return \think\Response
      */
-    protected function checkPermission(string $permission): bool
+    protected function created(mixed $data = null, string $message = '创建成功'): \think\Response
     {
-        $user = $this->user();
-        if (!$user) {
-            return false;
-        }
-
-        // Admin has all permissions
-        if (isset($user['is_admin']) && $user['is_admin'] == 1) {
-            return true;
-        }
-
-        // Check specific permission
-        return checkPermission($permission);
+        return ApiResponseHelper::created($data, $message);
     }
 
     /**
-     * Check domain permission
+     * 无内容响应（204 No Content）
      *
-     * @param int $domainId Domain ID
-     * @return bool
+     * @return \think\Response
      */
-    protected function checkDomainPermission(int $domainId): bool
+    protected function noContent(): \think\Response
     {
-        $user = $this->user();
-        if (!$user) {
-            return false;
-        }
+        return ApiResponseHelper::noContent();
+    }
 
-        // Admin has access to all domains
-        if (isset($user['is_admin']) && $user['is_admin'] == 1) {
-            return true;
-        }
+    /**
+     * 未认证响应（401 Unauthorized）
+     *
+     * @param string $message 错误信息
+     * @return \think\Response
+     */
+    protected function unauthorized(string $message = '未认证或认证已过期'): \think\Response
+    {
+        return ApiResponseHelper::unauthorized($message);
+    }
 
-        // Check if user owns the domain
-        $domain = \app\model\Domain::where('id', $domainId)->find();
-        if (!$domain) {
-            return false;
-        }
+    /**
+     * 无权限响应（403 Forbidden）
+     *
+     * @param string $message 错误信息
+     * @return \think\Response
+     */
+    protected function forbidden(string $message = '无权限访问'): \think\Response
+    {
+        return ApiResponseHelper::forbidden($message);
+    }
 
-        return $domain['uid'] == $user['id'];
+    /**
+     * 资源不存在响应（404 Not Found）
+     *
+     * @param string $message 错误信息
+     * @return \think\Response
+     */
+    protected function notFound(string $message = '资源不存在'): \think\Response
+    {
+        return ApiResponseHelper::notFound($message);
+    }
+
+    /**
+     * 验证失败响应（422 Unprocessable Entity）
+     *
+     * @param string $message 错误信息
+     * @param mixed $errors 验证错误详情
+     * @return \think\Response
+     */
+    protected function validationError(string $message = '请求参数验证失败', mixed $errors = null): \think\Response
+    {
+        return ApiResponseHelper::validationError($message, $errors);
+    }
+
+    /**
+     * 服务器错误响应（500 Internal Server Error）
+     *
+     * @param string $message 错误信息
+     * @return \think\Response
+     */
+    protected function serverError(string $message = '服务器内部错误'): \think\Response
+    {
+        return ApiResponseHelper::serverError($message);
     }
 }

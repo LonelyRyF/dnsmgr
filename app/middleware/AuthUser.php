@@ -11,6 +11,11 @@ class AuthUser
 {
     public function handle($request, Closure $next)
     {
+        // 跳过 API 路由（API 路由使用 JWT 认证）
+        if (strpos($request->url(), '/api/v1') === 0) {
+            return $next($request);
+        }
+
         $islogin = false;
         $cookie = cookie('user_token');
         $user = null;

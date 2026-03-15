@@ -1,144 +1,83 @@
 <?php
 
+declare(strict_types=1);
+
 namespace app\api\middleware;
 
-use Exception;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\SignatureInvalidException;
-use app\api\response\ApiResponse;
+use app\utils\JwtHelper;
+use app\utils\ApiResponseHelper;
+use Closure;
+use think\db\exception\DataNotFoundException;
+use think\db\exception\DbException;
+use think\db\exception\ModelNotFoundException;
 use think\facade\Db;
+use think\Request;
 
 /**
- * JWT Authentication Middleware
- * Validates JWT tokens and sets user context for API requests
+ * JWT 认证中间件
+ * 负责验证 API 请求中的 JWT Token
  */
 class JwtAuth
 {
     /**
-     * Handle request
+     * 处理请求
      *
-     * @param \think\Request $request
-     * @param \Closure $next
+     * @param Request $request
+     * @param Closure $next
      * @return mixed
+     * @throws DataNotFoundException
+     * @throws DbException
+     * @throws ModelNotFoundException
      */
-    public function handle($request, \Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
-        // Extract token from Authorization header
-        $token = $this->getTokenFromHeader($request);
+        // 从 Authorization 头提取 Token
+        $authorization = $request->header('Authorization', '');
 
-        if (!$token) {
-            return ApiResponse::unauthorized('Missing or invalid authorization token');
+        if (empty($authorization)) {
+            return ApiResponseHelper::unauthorized();
         }
 
-        try {
-            // Decode and verify JWT token
-            $payload = $this->decodeToken($token);
-
-            // Load user from database
-            $user = $this->loadUser($payload);
-
-            if (!$user) {
-                return ApiResponse::unauthorized('User not found or inactive');
-            }
-
-            // Set request properties for compatibility with existing permission checks
-            $request->islogin = true;
-            $request->isApi = true;
-            $request->user = $user;
-
-            return $next($request);
-
-        } catch (ExpiredException $e) {
-            return ApiResponse::unauthorized('Token has expired');
-        } catch (SignatureInvalidException $e) {
-            return ApiResponse::unauthorized('Invalid token signature');
-        } catch (Exception $e) {
-            return ApiResponse::unauthorized('Invalid token: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Extract token from Authorization header
-     *
-     * @param \think\Request $request
-     * @return string|null
-     */
-    private function getTokenFromHeader($request): ?string
-    {
-        $header = $request->header(config('jwt.header', 'Authorization'));
-
-        if (!$header) {
-            return null;
+        // 验证 Bearer Token 格式
+        if (!preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches)) {
+            return ApiResponseHelper::unauthorized();
         }
 
-        $prefix = config('jwt.prefix', 'Bearer');
+        $token = $matches[1];
 
-        // Check if header starts with "Bearer "
-        if (stripos($header, $prefix) === 0) {
-            return trim(substr($header, strlen($prefix)));
+        // 验证 Token 有效性
+        $payload = JwtHelper::verifyToken($token);
+        if (!$payload) {
+            return ApiResponseHelper::unauthorized();
         }
 
-        return null;
-    }
-
-    /**
-     * Decode and verify JWT token
-     *
-     * @param string $token
-     * @return object
-     * @throws Exception
-     */
-    private function decodeToken(string $token): object
-    {
-        $secret = config('jwt.secret');
-        $algo = config('jwt.algo', 'HS256');
-
-        if (empty($secret)) {
-            throw new Exception('JWT secret not configured');
+        // 验证 Token 类型（必须是 Access Token）
+        if (!isset($payload['type']) || $payload['type'] !== 'access') {
+            return ApiResponseHelper::unauthorized();
         }
 
-        // Set leeway for clock skew
-        JWT::$leeway = config('jwt.leeway', 60);
-
-        return JWT::decode($token, new Key($secret, $algo));
-    }
-
-    /**
-     * Load user from database based on token payload
-     *
-     * @param object $payload
-     * @return array|null
-     */
-    private function loadUser(object $payload): ?array
-    {
-        if (!isset($payload->uid) || !isset($payload->type)) {
-            return null;
+        // 从数据库验证用户状态
+        $user = Db::name('user')->where('id', $payload['uid'])->find();
+        if (!$user) {
+            return ApiResponseHelper::unauthorized('用户不存在');
         }
 
-        $uid = $payload->uid;
-        $type = $payload->type;
-
-        // Load user based on type (same logic as cookie-based auth)
-        if ($type === 'user') {
-            $user = Db::name('user')->where('id', $uid)->find();
-            if (!$user || (isset($user['status']) && $user['status'] == 0)) {
-                return null;
-            }
-            // Load permissions for non-admin users
-            if ($user['level'] == 1) {
-                $user['permission'] = Db::name('permission')->where('uid', $uid)->column('domain');
-            }
-            return $user;
-        } elseif ($type === 'account') {
-            $account = Db::name('account')->where('id', $uid)->find();
-            if (!$account || (isset($account['active']) && $account['active'] == 0)) {
-                return null;
-            }
-            return $account;
+        if ($user['status'] != 1) {
+            return ApiResponseHelper::forbidden('该用户已被封禁');
         }
 
-        return null;
+        // 构建用户信息（与现有 AuthUser 中间件保持一致）
+        $user['type'] = 'user';
+        $user['permission'] = [];
+        if ($user['level'] == 1) {
+            $user['permission'] = Db::name('permission')->where('uid', $user['id'])->column('domain');
+        }
+
+        // 注入用户信息到 Request
+        $request->islogin = true;
+        $request->isApi = true;
+        $request->user = $user;
+
+        return $next($request);
     }
 }
