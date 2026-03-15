@@ -77,6 +77,10 @@ class Install extends BaseController
                 $configData = file_get_contents(app()->getRootPath() . '.example.env');
                 $configData = str_replace(['{dbhost}', '{dbname}', '{dbuser}', '{dbpwd}', '{dbport}', '{dbprefix}'], [$mysql_host, $mysql_name, $mysql_user, $mysql_pwd, $mysql_port, $mysql_prefix], $configData);
 
+                // 生成随机 JWT_SECRET (64位随机字符串)
+                $jwt_secret = bin2hex(random_bytes(32));
+                $configData = preg_replace('/^JWT_SECRET\s*=\s*.+$/m', 'JWT_SECRET = ' . $jwt_secret, $configData);
+
                 try {
                     $DB = new PDO("mysql:host=" . $mysql_host . ";dbname=" . $mysql_name . ";port=" . $mysql_port, $mysql_user, $mysql_pwd);
                 } catch (Exception $e) {
