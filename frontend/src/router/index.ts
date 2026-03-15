@@ -89,11 +89,17 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!to.meta.public && !auth.isAuthenticated) {
-    return { name: 'login' }
+
+  // 如果没有 JWT token 且不是公开页面，尝试用 cookie 换取
+  if (!auth.isAuthenticated && !to.meta.public) {
+    const exchanged = await auth.exchangeToken()
+    if (!exchanged) {
+      return { name: 'login' }
+    }
   }
+
   if (to.name === 'login' && auth.isAuthenticated) {
     return { name: 'dashboard' }
   }

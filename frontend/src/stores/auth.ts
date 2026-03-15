@@ -50,5 +50,21 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('dns_user')
   }
 
-  return { token, user, isLoading, isAuthenticated, isAdmin, login, logout, fetchProfile }
+  async function exchangeToken() {
+    try {
+      const { data } = await authApi.exchangeToken()
+      if (data.code === 0) {
+        token.value = data.data.token
+        user.value = data.data.user
+        localStorage.setItem('dns_token', data.data.token)
+        localStorage.setItem('dns_user', JSON.stringify(data.data.user))
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  return { token, user, isLoading, isAuthenticated, isAdmin, login, logout, fetchProfile, exchangeToken }
 })

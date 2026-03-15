@@ -157,4 +157,74 @@ class Auth extends BaseController
     {
         return captcha();
     }
+
+    /**
+     * Cookie 换取 JWT Token
+     * 用于旧版界面登录后切换到新版 SPA
+     */
+    public function exchangeToken()
+    {
+        $cookie_token = cookie('user_token');
+        if (empty($cookie_token)) {
+            return json(['code' => -1, 'msg' => '未登录或登录已过期']);
+        }
+
+        // 解密 cookie token（复用现有逻辑）
+        $auth = authcode($cookie_token, 'DECODE', config_get('sys_key'));
+        if (!$auth) {
+            return json(['code' => -1, 'msg' => '登录凭证无效']);
+        }
+
+        $auth_arr = explode("\t", $auth);
+        if (count($auth_arr) < 4) {
+            return json(['code' => -1, 'msg' => '登录凭证格式错误']);
+        }
+
+        [$type, $id, $session, $expiretime] = $auth_arr;
+
+        // 检查是否过期
+        if ($expiretime < time()) {
+            return json(['code' => -1, 'msg' => '登录已过期']);
+        }
+
+        // 只支持用户登录，不支持域名快捷登录
+        if ($type !== 'user') {
+            return json(['code' => -1, 'msg' => '不支持的登录类型']);
+        }
+
+        // 获取用户信息
+        $user = Db::name('user')->where('id', $id)->find();
+        if (!$user) {
+            return json(['code' => -1, 'msg' => '用户不存在']);
+        }
+
+        // 验证 session
+        if ($session !== md5($user['id'] . $user['password'])) {
+            return json(['code' => -1, 'msg' => '登录凭证已失效']);
+        }
+
+        if ($user['status'] == 0) {
+            return json(['code' => -1, 'msg' => '此用户已被封禁']);
+        }
+
+        // 生成 JWT Token
+        $jwt_token = \app\lib\JWT::encode([
+            'id' => $user['id'],
+            'username' => $user['username'],
+            'level' => $user['level']
+        ]);
+
+        return json([
+            'code' => 0,
+            'msg' => '换取成功',
+            'data' => [
+                'token' => $jwt_token,
+                'user' => [
+                    'id' => $user['id'],
+                    'username' => $user['username'],
+                    'level' => $user['level']
+                ]
+            ]
+        ]);
+    }
 }

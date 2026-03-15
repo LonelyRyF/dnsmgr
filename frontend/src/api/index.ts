@@ -51,6 +51,8 @@ export const authApi = {
     apiClient.post<ApiResponse<{ token: string; user: User }>>('/auth/login', { username, password }),
   logout: () => apiClient.post('/auth/logout'),
   profile: () => apiClient.get<ApiResponse<User>>('/auth/profile'),
+  exchangeToken: () =>
+    axios.get<ApiResponse<{ token: string; user: User }>>('/api/auth/exchange-token'),
 }
 
 // ─── System ───────────────────────────────────────────────────────────────────

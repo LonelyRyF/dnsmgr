@@ -27,6 +27,7 @@ Route::get('/verifycode', 'auth/verifycode')->middleware(SessionInit::class);
 Route::post('/auth/totp', 'auth/totp')->middleware(SessionInit::class);
 Route::get('/logout', 'auth/logout');
 Route::any('/quicklogin', 'auth/quicklogin');
+Route::get('/api/auth/exchange-token', 'auth/exchangeToken');
 Route::any('/dmtask/status', 'dmonitor/status');
 Route::any('/optimizeip/status', 'optimizeip/status');
 Route::get('/cron', 'system/cron');
