@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\service\ScheduleService;
 use app\service\CertTaskService;
@@ -274,6 +274,7 @@ class System extends BaseController
             'post_max_size' => ini_get('post_max_size'),
             'memory_limit' => ini_get('memory_limit'),
             'max_execution_time' => ini_get('max_execution_time'),
+            'date' => date('Y-m-d H:i:s'),
         ];
 
         return $this->success($info, '获取系统信息成功');

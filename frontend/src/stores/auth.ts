@@ -14,7 +14,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     try {
       const { data } = await authApi.login(username, password)
-      if (data.code === 0) {
+      if (data.success) {
         token.value = data.data.token
         user.value = data.data.user
         localStorage.setItem('dns_token', data.data.token)
@@ -34,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchProfile() {
     try {
       const { data } = await authApi.profile()
-      if (data.code === 0) {
+      if (data.success) {
         user.value = data.data
         localStorage.setItem('dns_user', JSON.stringify(data.data))
       }
@@ -53,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function exchangeToken() {
     try {
       const { data } = await authApi.exchangeToken()
-      if (data.code === 0) {
+      if (data.success) {
         token.value = data.data.token
         user.value = data.data.user
         localStorage.setItem('dns_token', data.data.token)

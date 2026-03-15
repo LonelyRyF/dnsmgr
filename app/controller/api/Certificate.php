@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\lib\CertHelper;
 use app\lib\DeployHelper;
@@ -460,16 +460,38 @@ class Certificate extends BaseController
         }
 
         try {
-            $service = new CertDeployService();
             $results = [];
 
             foreach ($deployAccounts as $aid) {
-                $result = $service->deploy($id, $aid);
-                $results[] = [
-                    'aid' => $aid,
-                    'success' => $result['success'] ?? false,
-                    'message' => $result['message'] ?? ''
-                ];
+                $client = DeployHelper::getModel($aid);
+                if (!$client) {
+                    $results[] = [
+                        'aid' => $aid,
+                        'success' => false,
+                        'message' => '部署模块不存在'
+                    ];
+                    continue;
+                }
+                
+                try {
+                    // 构造一个空的 config 和 info
+                    $account = Db::name('cert_account')->where('id', $aid)->find();
+                    $config = $account ? json_decode($account['config'], true) : [];
+                    $config['domainList'] = Db::name('cert_domain')->where('oid', $id)->order('sort', 'asc')->column('domain');
+                    
+                    $client->deploy($certificate['fullchain'], $certificate['privatekey'], $config, []);
+                    $results[] = [
+                        'aid' => $aid,
+                        'success' => true,
+                        'message' => '部署成功'
+                    ];
+                } catch (Exception $ex) {
+                    $results[] = [
+                        'aid' => $aid,
+                        'success' => false,
+                        'message' => $ex->getMessage()
+                    ];
+                }
             }
 
             return $this->success($results, '证书部署完成');
@@ -1198,6 +1220,43 @@ class Certificate extends BaseController
     }
 
     /**
+     * 执行证书订单任务
+     * POST /api/v1/certificates/:id/execute
+     */
+    public function certificateExecute()
+    {
+        if ($this->request->user['level'] != 2) {
+            return $this->forbidden('仅管理员可访问');
+        }
+
+        $id = $this->request->param('id', 0, 'intval');
+        $reset = $this->request->post('reset', 0, 'intval');
+
+        $cert = Db::name('cert_order')->where('id', $id)->find();
+        if (!$cert) {
+            return $this->notFound('证书订单不存在');
+        }
+
+        try {
+            $service = new CertOrderService($id);
+            if ($reset == 1) {
+                $service->reset();
+            }
+            $retcode = $service->process(true);
+            
+            if ($retcode == 3) {
+                return $this->success(null, '证书已签发成功！');
+            } elseif ($retcode == 1) {
+                return $this->success(null, '添加DNS记录成功！请等待DNS生效后点击验证');
+            } else {
+                return $this->success(null, '订单正在处理...');
+            }
+        } catch (Exception $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    /**
      * 获取CNAME主机记录
      */
     private function getCnameHost(string $domain): string
@@ -1207,6 +1266,98 @@ class Certificate extends BaseController
             return '_acme-challenge';
         } else {
             return '_acme-challenge.' . substr($domain, 0, -strlen($main) - 1);
+        }
+    }
+
+    // ==================== 高级操作与日志 ====================
+
+    /**
+     * 获取任务日志
+     * GET /api/v1/certificates/log
+     * GET /api/v1/deploy-tasks/log
+     */
+    public function showLog()
+    {
+        if ($this->request->user['level'] != 2) {
+            return $this->forbidden('仅管理员可访问');
+        }
+
+        $processid = $this->request->get('processid', '', 'trim');
+        if (empty($processid)) {
+            return $this->validationError('processid 参数不能为空');
+        }
+
+        $file = app()->getRuntimePath() . 'log/' . $processid . '.log';
+        if (!file_exists($file)) {
+            return $this->error('日志文件不存在');
+        }
+
+        $data = [
+            'content' => file_get_contents($file),
+            'time' => filemtime($file)
+        ];
+
+        return $this->success($data, '获取日志成功');
+    }
+
+    /**
+     * 切换证书自动续签
+     * POST /api/v1/certificates/:id/auto-renew
+     */
+    public function certificateAutoRenew()
+    {
+        if ($this->request->user['level'] != 2) return $this->forbidden('仅管理员可访问');
+
+        $id = $this->request->param('id', 0, 'intval');
+        $isauto = $this->request->post('isauto', 0, 'intval');
+
+        $cert = Db::name('cert_order')->where('id', $id)->find();
+        if (!$cert) return $this->notFound('证书订单不存在');
+
+        Db::name('cert_order')->where('id', $id)->update(['isauto' => $isauto]);
+        return $this->success(['isauto' => $isauto], '切换自动续签状态成功');
+    }
+
+    /**
+     * 重置证书订单
+     * POST /api/v1/certificates/:id/reset
+     */
+    public function certificateReset()
+    {
+        if ($this->request->user['level'] != 2) return $this->forbidden('仅管理员可访问');
+
+        $id = $this->request->param('id', 0, 'intval');
+        $cert = Db::name('cert_order')->where('id', $id)->find();
+        if (!$cert) return $this->notFound('证书订单不存在');
+
+        try {
+            $service = new CertOrderService($id);
+            $service->cancel();
+            $service->reset();
+            return $this->success(null, '重置证书订单成功');
+        } catch (Exception $e) {
+            return $this->error('重置证书订单失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 吊销证书
+     * POST /api/v1/certificates/:id/revoke
+     */
+    public function certificateRevoke()
+    {
+        if ($this->request->user['level'] != 2) return $this->forbidden('仅管理员可访问');
+
+        $id = $this->request->param('id', 0, 'intval');
+        $cert = Db::name('cert_order')->where('id', $id)->find();
+        if (!$cert) return $this->notFound('证书订单不存在');
+
+        try {
+            $service = new CertOrderService($id);
+            $service->revoke();
+            return $this->success(null, '吊销证书成功');
+        } catch (Exception $e) {
+            return $this->error('吊销证书失败：' . $e->getMessage());
         }
     }
 }

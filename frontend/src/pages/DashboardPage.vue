@@ -135,19 +135,19 @@ const colorMap: Record<string, string> = {
         <div v-if="sysInfo" class="space-y-2.5">
           <div class="flex justify-between text-sm">
             <span class="text-text-muted">框架版本</span>
-            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.framework_version }}</span>
+            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.think_version || 'Unknown' }}</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-text-muted">PHP 版本</span>
-            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.php_version }}</span>
+            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.php_version || 'Unknown' }}</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-text-muted">数据库</span>
-            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.mysql_version }}</span>
+            <span class="text-text font-mono text-xs bg-bg-hover px-2 py-0.5 rounded">{{ sysInfo.db_version || 'Unknown' }}</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-text-muted">Web 服务器</span>
-            <span class="text-text text-xs">{{ sysInfo.software }}</span>
+            <span class="text-text text-xs">{{ sysInfo.server_software || 'Unknown' }}</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-text-muted">服务器时间</span>

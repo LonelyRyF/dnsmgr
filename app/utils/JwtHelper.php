@@ -23,7 +23,7 @@ class JwtHelper
     public static function generateToken(int $uid, string $username, int $level): array
     {
         // 统一配置读取：优先 JWT_SECRET，fallback 到 sys_key
-        $secret = env('JWT_SECRET');
+        $secret = env('jwt.JWT_SECRET');
         if (empty($secret)) {
             $secret = config_get('sys_key');
         }
@@ -31,9 +31,9 @@ class JwtHelper
             throw new Exception('JWT_SECRET 未配置且 sys_key 不可用');
         }
 
-        $issuer = env('JWT_ISSUER', 'dnsmgr');
-        $accessTtl = (int)env('JWT_TTL', 7200); // 默认2小时
-        $refreshTtl = (int)env('JWT_REFRESH_TTL', 604800); // 默认7天
+        $issuer = env('jwt.JWT_ISSUER', 'dnsmgr');
+        $accessTtl = (int)env('jwt.JWT_TTL', 7200); // 默认2小时
+        $refreshTtl = (int)env('jwt.JWT_REFRESH_TTL', 604800); // 默认7天
 
         $now = time();
 
@@ -77,7 +77,7 @@ class JwtHelper
     {
         try {
             // 统一配置读取：优先 JWT_SECRET，fallback 到 sys_key
-            $secret = env('JWT_SECRET');
+            $secret = env('jwt.JWT_SECRET');
             if (empty($secret)) {
                 $secret = config_get('sys_key');
             }

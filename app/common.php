@@ -630,9 +630,9 @@ function checkTableExists($table)
  */
 function generateJwtToken($uid, $type)
 {
-    $secret = env('JWT_SECRET', config_get('sys_key'));
-    $issuer = env('JWT_ISSUER', 'dnsmgr');
-    $ttl = env('JWT_TTL', 7200);
+    $secret = env('jwt.JWT_SECRET', config_get('sys_key'));
+    $issuer = env('jwt.JWT_ISSUER', 'dnsmgr');
+    $ttl = env('jwt.JWT_TTL', 7200);
     $algo = 'HS256';
 
     $payload = [

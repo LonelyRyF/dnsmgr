@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\BaseController as AppBaseController;
 use app\utils\ApiResponseHelper;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\lib\DnsHelper;
 use think\facade\Db;

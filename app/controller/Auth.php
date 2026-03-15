@@ -199,7 +199,7 @@ class Auth extends BaseController
         }
 
         // 验证 session
-        if ($session !== md5($user['id'] . $user['password'])) {
+        if ($session !== md5((string)$user['id'] . $user['password'])) {
             return json(['code' => -1, 'msg' => '登录凭证已失效']);
         }
 

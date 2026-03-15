@@ -1,6 +1,6 @@
 <?php
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\api\response\ApiResponse;
 

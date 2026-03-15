@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\api\controller;
+namespace app\controller\api;
 
 use app\lib\DnsHelper;
 use think\facade\Db;
@@ -294,6 +294,55 @@ class Domain extends BaseController
             ], '同步域名记录成功');
         } catch (Exception $e) {
             return $this->error('同步失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 批量操作域名
+     * POST /api/v1/domains/batch-operation
+     */
+    public function domainBatchOperation()
+    {
+        if ($this->request->user['level'] != 2) {
+            return $this->forbidden('仅管理员可进行此操作');
+        }
+
+        $action = $this->request->post('action', '', 'trim');
+        $ids = $this->request->post('ids', []);
+        
+        if (empty($action) || empty($ids) || !is_array($ids)) {
+            return $this->validationError('参数错误');
+        }
+
+        Db::startTrans();
+        try {
+            switch ($action) {
+                case 'delete':
+                    Db::name('domain')->where('id', 'in', $ids)->delete();
+                    Db::name('domain_alias')->where('did', 'in', $ids)->delete();
+                    Db::name('dmtask')->where('did', 'in', $ids)->delete();
+                    Db::name('optimizeip')->where('did', 'in', $ids)->delete();
+                    Db::name('sctask')->where('did', 'in', $ids)->delete();
+                    break;
+                case 'notice_on':
+                    Db::name('domain')->where('id', 'in', $ids)->update(['is_notice' => 1]);
+                    break;
+                case 'notice_off':
+                    Db::name('domain')->where('id', 'in', $ids)->update(['is_notice' => 0]);
+                    break;
+                case 'remark':
+                    $remark = $this->request->post('remark', '', 'trim');
+                    Db::name('domain')->where('id', 'in', $ids)->update(['remark' => $remark ?: null]);
+                    break;
+                default:
+                    return $this->validationError('未知的操作指令');
+            }
+            
+            Db::commit();
+            return $this->success(null, '批量操作成功');
+        } catch (Exception $e) {
+            Db::rollback();
+            return $this->error('批量操作失败：' . $e->getMessage());
         }
     }
 }

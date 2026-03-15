@@ -10,17 +10,17 @@ class JWT
 {
     private static function getSecret(): string
     {
-        return env('JWT_SECRET', config_get('sys_key'));
+        return env('jwt.JWT_SECRET', config_get('sys_key'));
     }
 
     private static function getIssuer(): string
     {
-        return env('JWT_ISSUER', 'dnsmgr');
+        return env('jwt.JWT_ISSUER', 'dnsmgr');
     }
 
     private static function getTTL(): int
     {
-        return (int)env('JWT_TTL', 7200);
+        return (int)env('jwt.JWT_TTL', 7200);
     }
 
     /**

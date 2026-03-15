@@ -4,9 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 export interface ApiResponse<T = unknown> {
-  code: number
+  success: boolean
   message: string
   data: T
+  timestamp?: number
+  errors?: unknown
   meta?: {
     total?: number
     page?: number
@@ -61,10 +63,10 @@ export const systemApi = {
   getConfig: () => apiClient.get<ApiResponse<SystemConfig>>('/system/config'),
   updateConfig: (data: Partial<SystemConfig>) => apiClient.post('/system/config', data),
   clearCache: () => apiClient.post('/system/clear-cache'),
-  testMail: (data: object) => apiClient.post('/system/test-mail', data),
-  testTelegram: (data: object) => apiClient.post('/system/test-telegram', data),
-  testWebhook: (data: object) => apiClient.post('/system/test-webhook', data),
-  testProxy: (data: object) => apiClient.post('/system/test-proxy', data),
+  testMail: (data?: object) => apiClient.post('/system/test-mail', data),
+  testTelegram: (data?: object) => apiClient.post('/system/test-telegram', data),
+  testWebhook: (data?: object) => apiClient.post('/system/test-webhook', data),
+  testProxy: (data?: object) => apiClient.post('/system/test-proxy', data),
   getCronConfig: () => apiClient.get('/system/cron-config'),
 }
 
@@ -85,6 +87,7 @@ export const domainsApi = {
   update: (id: number, data: object) => apiClient.post(`/domains/${id}/update`, data),
   delete: (id: number) => apiClient.post(`/domains/${id}/delete`),
   sync: (id: number) => apiClient.post(`/domains/${id}/sync`),
+  batchOperation: (data: object) => apiClient.post('/domains/batch-operation', data),
 }
 
 // ─── Records ──────────────────────────────────────────────────────────────────
@@ -105,6 +108,8 @@ export const recordsApi = {
     apiClient.post(`/records/${domainId}/batch-create`, data),
   batchOperation: (domainId: number, data: object) =>
     apiClient.post(`/records/${domainId}/batch-operation`, data),
+  batchUpdate: (domainId: number, data: object) =>
+    apiClient.post(`/records/${domainId}/batch-update`, data),
 }
 
 // ─── Certificates ─────────────────────────────────────────────────────────────
@@ -120,6 +125,11 @@ export const certificatesApi = {
   delete: (id: number) => apiClient.post(`/certificates/${id}/delete`),
   deploy: (id: number, data: object) => apiClient.post(`/certificates/${id}/deploy`, data),
   process: (id: number) => apiClient.get(`/certificates/${id}/process`),
+  log: (processid: string) => apiClient.get('/certificates/log', { params: { processid } }),
+  autoRenew: (id: number, isauto: number) => apiClient.post(`/certificates/${id}/auto-renew`, { isauto }),
+  reset: (id: number) => apiClient.post(`/certificates/${id}/reset`),
+  execute: (id: number, data?: object) => apiClient.post(`/certificates/${id}/execute`, data),
+  revoke: (id: number) => apiClient.post(`/certificates/${id}/revoke`),
 }
 
 // ─── Deploy Tasks ─────────────────────────────────────────────────────────────
@@ -137,6 +147,7 @@ export const deployApi = {
   taskReset: (id: number) => apiClient.post(`/deploy-tasks/${id}/reset`),
   taskExecute: (id: number) => apiClient.post(`/deploy-tasks/${id}/execute`),
   taskProcess: (id: number) => apiClient.get(`/deploy-tasks/${id}/process`),
+  taskLog: (processid: string) => apiClient.get('/deploy-tasks/log', { params: { processid } }),
 }
 
 // ─── Monitor ──────────────────────────────────────────────────────────────────
@@ -150,6 +161,7 @@ export const monitorApi = {
   taskUpdate: (id: number, data: object) => apiClient.post(`/monitor/tasks/${id}/update`, data),
   taskDelete: (id: number) => apiClient.post(`/monitor/tasks/${id}/delete`),
   taskToggleActive: (id: number) => apiClient.post(`/monitor/tasks/${id}/active`),
+  taskBatchOperation: (data: object) => apiClient.post('/monitor/tasks/batch-operation', data),
   taskLogs: (id: number, params?: object) => apiClient.get(`/monitor/tasks/${id}/logs`, { params }),
 }
 
@@ -188,10 +200,15 @@ export interface User {
 }
 
 export interface SystemInfo {
-  framework_version: string
   php_version: string
-  mysql_version: string
-  software: string
+  think_version: string
+  server_software: string
+  os: string
+  db_version: string
+  upload_max_filesize: string
+  post_max_size: string
+  memory_limit: string
+  max_execution_time: string
   date: string
 }
 
@@ -215,6 +232,10 @@ export interface DomainItem {
   account_name?: string
   type?: string
   status: number
+  is_notice?: number
+  is_hide?: number
+  is_sso?: number
+  remark?: string
   record_count?: number
   created_at: string
 }
@@ -228,6 +249,7 @@ export interface DnsRecord {
   line?: string
   ttl: number
   mx?: number
+  weight?: number
   status: number
   remark?: string
   created_at?: string
@@ -237,6 +259,11 @@ export interface Certificate {
   id: number
   domain: string
   status: number
+  isauto: number
+  fullchain?: string
+  privatekey?: string
+  processid?: string
+  error?: string
   expire_time?: string
   created_at: string
 }
@@ -252,11 +279,35 @@ export interface DeployTask {
 
 export interface MonitorTask {
   id: number
-  name: string
-  host: string
+  did: string
+  rr: string
+  domain?: string
+  recordid: string
+  recordinfo: string
+  type: number
+  main_value: string
+  backup_value: string
+  checktype: number
+  checkurl: string
+  tcpport?: number
+  frequency: number
+  cycle: number
+  timeout: number
+  proxy: number
+  cdn: number
+  remark: string
   status: number
   active: number
-  last_check?: string
+  checktimestr?: string
+  addtimestr?: string
+}
+
+export interface MonitorLog {
+  id: number
+  taskid: number
+  action: number
+  date: string
+  error: string
 }
 
 export interface MonitorOverview {
@@ -264,7 +315,8 @@ export interface MonitorOverview {
   active: number
   healthy: number
   unhealthy: number
-  running: number
+  running?: number
+  run_state?: number
 }
 
 export interface UserItem {
