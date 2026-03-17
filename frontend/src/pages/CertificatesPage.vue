@@ -34,7 +34,7 @@ const { data: deployAccounts } = useQuery({ queryKey: ['deploy-accounts'], query
 
 const { data, isLoading, refetch } = useQuery({
   queryKey: ['certificates'],
-  queryFn: async () => (await certificatesApi.list()).data,
+  queryFn: async () => (await certificatesApi.list()).data.data,
 })
 
 const certStatusLabels: Record<number, string> = {

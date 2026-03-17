@@ -13,12 +13,12 @@ const { data: sysInfo } = useQuery({
 
 const { data: domains } = useQuery({
   queryKey: ['domains', 'list'],
-  queryFn: async () => (await domainsApi.list({ limit: 100 })).data,
+  queryFn: async () => (await domainsApi.list({ limit: 100 })).data.data,
 })
 
 const { data: certs } = useQuery({
   queryKey: ['certificates', 'list'],
-  queryFn: async () => (await certificatesApi.list({ limit: 100 })).data,
+  queryFn: async () => (await certificatesApi.list({ limit: 100 })).data.data,
 })
 
 const { data: monitorOverview } = useQuery({
@@ -29,14 +29,14 @@ const { data: monitorOverview } = useQuery({
 const statCards = computed(() => [
   {
     label: '域名总数',
-    value: domains.value?.meta?.total ?? domains.value?.data?.length ?? 0,
+    value: domains.value?.pagination?.total ?? domains.value?.items?.length ?? 0,
     icon: Globe,
     color: 'accent',
     to: '/domains',
   },
   {
     label: 'SSL 证书',
-    value: certs.value?.meta?.total ?? certs.value?.data?.length ?? 0,
+    value: certs.value?.pagination?.total ?? certs.value?.items?.length ?? 0,
     icon: ShieldCheck,
     color: 'success',
     to: '/certificates',

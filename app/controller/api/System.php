@@ -98,6 +98,7 @@ class System extends BaseController
             return $this->forbidden('仅管理员可访问');
         }
 
+        Cache::delete('configs');
         $tgbot_token = config_get('tgbot_token');
         $tgbot_chatid = config_get('tgbot_chatid');
 
@@ -125,6 +126,7 @@ class System extends BaseController
             return $this->forbidden('仅管理员可访问');
         }
 
+        Cache::delete('configs');
         $webhook_url = config_get('webhook_url');
         if (empty($webhook_url)) {
             return $this->error('请先保存设置');

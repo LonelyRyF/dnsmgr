@@ -12,6 +12,14 @@ const route = useRoute()
 const auth = useAuthStore()
 const collapsed = ref(false)
 
+defineProps<{
+  open?: boolean
+}>()
+
+defineEmits<{
+  toggle: []
+}>()
+
 const navItems = computed(() => [
   { name: '控制台', to: '/', icon: LayoutDashboard },
   { name: '域名管理', to: '/domains', icon: Globe },
@@ -33,8 +41,11 @@ function isActive(to: string) {
 
 <template>
   <aside
-    class="flex flex-col bg-bg-subtle border-r border-border transition-all duration-300 shrink-0"
-    :class="collapsed ? 'w-16' : 'w-60'"
+    class="hidden md:flex flex-col bg-bg-subtle border-r border-border transition-all duration-300 shrink-0 fixed md:static inset-y-0 left-0 z-40 md:z-auto"
+    :class="[
+      collapsed ? 'w-16' : 'w-60',
+      open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+    ]"
   >
     <!-- Logo -->
     <div class="flex items-center gap-3 px-4 h-14 border-b border-border shrink-0">

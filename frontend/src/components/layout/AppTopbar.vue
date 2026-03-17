@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, User, ChevronRight } from 'lucide-vue-next'
+import { LogOut, User, ChevronRight, Menu } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const showUserMenu = ref(false)
+
+defineProps<{
+  sidebarOpen?: boolean
+}>()
+
+defineEmits<{
+  toggleSidebar: []
+}>()
 
 const breadcrumbs = computed(() => {
   const parts = route.matched
@@ -24,6 +32,15 @@ async function logout() {
 
 <template>
   <header class="h-14 border-b border-border bg-bg-subtle shrink-0 flex items-center px-6 gap-4">
+    <!-- Mobile menu button -->
+    <button
+      class="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-bg-hover transition-colors"
+      @click="$emit('toggleSidebar')"
+      title="切换菜单"
+    >
+      <Menu class="w-4 h-4 text-text" />
+    </button>
+
     <!-- Breadcrumbs -->
     <nav class="flex items-center gap-1.5 text-sm flex-1 min-w-0">
       <span class="text-text-disabled">首页</span>

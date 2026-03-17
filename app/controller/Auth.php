@@ -80,7 +80,7 @@ class Auth extends BaseController
     {
         Db::name('log')->insert(['uid' => $user['id'], 'action' => '登录后台', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s")]);
         DB::name('user')->where('id', $user['id'])->update(['lasttime' => date("Y-m-d H:i:s")]);
-        $session = md5($user['id'] . $user['password']);
+        $session = md5((string)$user['id'] . $user['password']);
         $expiretime = time() + 2562000;
         $token = authcode("user\t{$user['id']}\t{$session}\t{$expiretime}", 'ENCODE', config_get('sys_key'));
         cookie('user_token', $token, ['expire' => $expiretime, 'httponly' => true]);
@@ -147,7 +147,7 @@ class Auth extends BaseController
     private function loginDomain($row)
     {
         Db::name('log')->insert(['uid' => 0, 'action' => '域名快捷登录', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s"), 'domain' => $row['name']]);
-        $session = md5($row['id'] . $row['name']);
+        $session = md5((string)$row['id'] . $row['name']);
         $expiretime = time() + 2562000;
         $token = authcode("domain\t{$row['id']}\t{$session}\t{$expiretime}", 'ENCODE', config_get('sys_key'));
         cookie('user_token', $token, ['expire' => $expiretime, 'httponly' => true]);
@@ -200,7 +200,8 @@ class Auth extends BaseController
 
         // 验证 session
         if ($session !== md5((string)$user['id'] . $user['password'])) {
-            return json(['code' => -1, 'msg' => '登录凭证已失效']);
+            return json(['code' => -1, 'msg' => '登录凭证已npm build
+            失效']);
         }
 
         if ($user['status'] == 0) {

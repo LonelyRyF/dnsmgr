@@ -68,7 +68,15 @@ class Auth extends BaseController
                 'lasttime' => date("Y-m-d H:i:s")
             ]);
 
-            return $this->success($tokens, '登录成功');
+            return $this->success([
+                'token' => $tokens['access_token'],
+                'refresh_token' => $tokens['refresh_token'],
+                'user' => [
+                    'id' => $user['id'],
+                    'username' => $user['username'],
+                    'level' => $user['level']
+                ]
+            ], '登录成功');
         } catch (Exception $e) {
             return $this->serverError('Token 生成失败');
         }

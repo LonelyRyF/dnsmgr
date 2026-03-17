@@ -45,8 +45,8 @@ const testActionMutation = useMutation({
     if (type === 'webhook') return (await systemApi.testWebhook()).data
     if (type === 'proxy') return (await systemApi.testProxy(payload)).data
   },
-  onSuccess: () => toast.success('测试成功'),
-  onError: (err: any) => toast.error(err.response?.data?.error || '测试失败'),
+  onSuccess: (data: any) => toast.success(data?.message || '测试成功'),
+  onError: (err: any) => toast.error(err.response?.data?.message || '测试失败'),
 })
 
 function testConfig(type: string) {

@@ -92,16 +92,10 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  // 如果没有 JWT token 且不是公开页面，检查是否有 cookie token
+  // 如果没有 JWT token 且不是公开页面，尝试用 cookie 换取
   if (!auth.isAuthenticated && !to.meta.public) {
-    // 只有在有 cookie token 时才尝试换取
-    const hasCookie = document.cookie.includes('user_token')
-    if (hasCookie) {
-      const exchanged = await auth.exchangeToken()
-      if (!exchanged) {
-        return { name: 'login' }
-      }
-    } else {
+    const exchanged = await auth.exchangeToken()
+    if (!exchanged) {
       return { name: 'login' }
     }
   }

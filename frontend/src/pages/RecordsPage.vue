@@ -73,16 +73,16 @@ const { data: domain } = useQuery({
 
 const { data, isLoading, refetch } = useQuery({
   queryKey: ['records', domainId],
-  queryFn: async () => (await recordsApi.list(domainId.value)).data,
+  queryFn: async () => (await recordsApi.list(domainId.value)).data.data,
 })
 
 const recordTypes = computed(() => {
-  const types = new Set((data.value?.data ?? []).map(r => r.type))
+  const types = new Set((data.value?.items ?? []).map(r => r.type))
   return Array.from(types).sort()
 })
 
 const filtered = computed(() => {
-  let items = data.value?.data ?? []
+  let items = data.value?.items ?? []
   if (typeFilter.value) items = items.filter(r => r.type === typeFilter.value)
   const q = search.value.toLowerCase()
   if (q) items = items.filter(r =>

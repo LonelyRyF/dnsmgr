@@ -16,6 +16,16 @@ export interface ApiResponse<T = unknown> {
   }
 }
 
+export interface PaginatedResponse<T> {
+  items: T[]
+  pagination: {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
+}
+
 const apiClient = axios.create({
   baseURL: '/api/v1',
   timeout: 30_000,

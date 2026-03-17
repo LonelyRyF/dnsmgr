@@ -21,7 +21,7 @@ const { data, isLoading, refetch } = useQuery({
 })
 
 const addMutation = useMutation({
-  mutationFn: () => accountsApi.create({ ...addForm.value, config: JSON.parse(addForm.value.config) }),
+  mutationFn: () => accountsApi.create({ ...addForm.value, config: JSON.parse(addForm.value.config || '{}') }),
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: ['accounts'] })
     showAddSlide.value = false

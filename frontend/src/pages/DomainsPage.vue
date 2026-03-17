@@ -58,11 +58,11 @@ const { data: accounts } = useQuery({
 
 const { data, isLoading, refetch } = useQuery({
   queryKey: ['domains', 'list'],
-  queryFn: async () => (await domainsApi.list()).data,
+  queryFn: async () => (await domainsApi.list()).data.data,
 })
 
 const filtered = computed(() => {
-  const items = data.value?.data ?? []
+  const items = data.value?.items ?? []
   const q = search.value.toLowerCase()
   return q ? items.filter(d => d.name.toLowerCase().includes(q)) : items
 })

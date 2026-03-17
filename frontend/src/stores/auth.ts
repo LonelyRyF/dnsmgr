@@ -4,7 +4,8 @@ import { authApi, type User } from '@/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('dns_token'))
-  const user = ref<User | null>(JSON.parse(localStorage.getItem('dns_user') || 'null'))
+  const userStr = localStorage.getItem('dns_user')
+  const user = ref<User | null>(userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null)
   const isLoading = ref(false)
 
   const isAuthenticated = computed(() => !!token.value)
@@ -14,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     try {
       const { data } = await authApi.login(username, password)
-      if (data.success) {
+      if (data.success && data.data?.token && data.data?.user) {
         token.value = data.data.token
         user.value = data.data.user
         localStorage.setItem('dns_token', data.data.token)
