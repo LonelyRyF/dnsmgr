@@ -77,15 +77,15 @@ const { data, isLoading, refetch } = useQuery({
 })
 
 const recordTypes = computed(() => {
-  const types = new Set((data.value?.items ?? []).map(r => r.type))
+  const types = new Set((data.value?.items ?? []).map((r: DnsRecord) => r.type))
   return Array.from(types).sort()
 })
 
 const filtered = computed(() => {
   let items = data.value?.items ?? []
-  if (typeFilter.value) items = items.filter(r => r.type === typeFilter.value)
+  if (typeFilter.value) items = items.filter((r: DnsRecord) => r.type === typeFilter.value)
   const q = search.value.toLowerCase()
-  if (q) items = items.filter(r =>
+  if (q) items = items.filter((r: DnsRecord) =>
     r.name.toLowerCase().includes(q) || r.value.toLowerCase().includes(q)
   )
   return items
@@ -114,7 +114,7 @@ const updateMutation = useMutation({
     const prev = qc.getQueryData<typeof data.value>(['records', domainId.value])
     qc.setQueryData(['records', domainId.value], (old: typeof data.value) => ({
       ...old,
-      data: old?.data?.map(r => r.id === record.id ? { ...r, ...payload } : r),
+      items: old?.items?.map((r: DnsRecord) => r.id === record.id ? { ...r, ...payload } : r),
     }))
     return { prev }
   },
@@ -143,7 +143,7 @@ const toggleMutation = useMutation({
     const prev = qc.getQueryData(['records', domainId.value])
     qc.setQueryData(['records', domainId.value], (old: typeof data.value) => ({
       ...old,
-      data: old?.data?.map(r => r.id === record.id ? { ...r, status: r.status === 1 ? 0 : 1 } : r),
+      items: old?.items?.map((r: DnsRecord) => r.id === record.id ? { ...r, status: r.status === 1 ? 0 : 1 } : r),
     }))
     return { prev }
   },
@@ -226,8 +226,8 @@ const batchModifyMutation = useMutation({
 
 function submitBatchModify() {
   const recordsPayload = filtered.value
-    .filter(r => selected.value.has(r.id))
-    .map(r => ({ recordid: r.id, name: r.name, type: r.type, value: r.value, line: r.line, ttl: r.ttl, mx: r.mx, weight: r.weight, remark: r.remark }))
+    .filter((r: DnsRecord) => selected.value.has(r.id))
+    .map((r: DnsRecord) => ({ recordid: r.id, name: r.name, type: r.type, value: r.value, line: r.line, ttl: r.ttl, mx: r.mx, weight: r.weight, remark: r.remark }))
     
   const act = batchModifyType.value
   const p = { action: act, records: recordsPayload } as any
@@ -244,7 +244,7 @@ function toggleSelectAll() {
   if (selected.value.size === filtered.value.length) {
     selected.value.clear()
   } else {
-    filtered.value.forEach(r => selected.value.add(r.id))
+    filtered.value.forEach((r: DnsRecord) => selected.value.add(r.id))
   }
 }
 
@@ -258,8 +258,8 @@ async function batchOperation(op: string) {
   if (op === 'delete' && !confirm(`确定删除选中的 ${selected.value.size} 条记录吗？`)) return
   
   const recordsPayload = filtered.value
-    .filter(r => selected.value.has(r.id))
-    .map(r => ({ recordid: r.id }))
+    .filter((r: DnsRecord) => selected.value.has(r.id))
+    .map((r: DnsRecord) => ({ recordid: r.id }))
     
   try {
     await recordsApi.batchOperation(domainId.value, {
@@ -485,7 +485,7 @@ async function batchOperation(op: string) {
 
     <!-- Footer stats -->
     <div v-if="data" class="mt-3 text-xs text-text-muted">
-      共 {{ data.data?.length ?? 0 }} 条记录
+      共 {{ data.items?.length ?? 0 }} 条记录
       <span v-if="search || typeFilter">（已过滤：{{ filtered.length }} 条）</span>
     </div>
 

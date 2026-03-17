@@ -200,8 +200,7 @@ class Auth extends BaseController
 
         // 验证 session
         if ($session !== md5((string)$user['id'] . $user['password'])) {
-            return json(['code' => -1, 'msg' => '登录凭证已npm build
-            失效']);
+            return json(['code' => -1, 'msg' => '登录凭证已失效']);
         }
 
         if ($user['status'] == 0) {

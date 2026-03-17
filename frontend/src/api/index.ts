@@ -91,7 +91,7 @@ export const accountsApi = {
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
 export const domainsApi = {
-  list: (params?: object) => apiClient.get<ApiResponse<DomainItem[]>>('/domains/list', { params }),
+  list: (params?: object) => apiClient.get<ApiResponse<PaginatedResponse<DomainItem>>>('/domains/list', { params }),
   create: (data: object) => apiClient.post('/domains/create', data),
   detail: (id: number) => apiClient.get<ApiResponse<DomainItem>>(`/domains/${id}/detail`),
   update: (id: number, data: object) => apiClient.post(`/domains/${id}/update`, data),
@@ -103,7 +103,7 @@ export const domainsApi = {
 // ─── Records ──────────────────────────────────────────────────────────────────
 export const recordsApi = {
   list: (domainId: number, params?: object) =>
-    apiClient.get<ApiResponse<DnsRecord[]>>(`/records/${domainId}/list`, { params }),
+    apiClient.get<ApiResponse<PaginatedResponse<DnsRecord>>>(`/records/${domainId}/list`, { params }),
   detail: (domainId: number, id: number) =>
     apiClient.get<ApiResponse<DnsRecord>>(`/records/${domainId}/${id}/detail`),
   create: (domainId: number, data: object) =>
@@ -129,7 +129,7 @@ export const certificatesApi = {
   accountUpdate: (id: number, data: object) => apiClient.post(`/cert-accounts/${id}/update`, data),
   accountDelete: (id: number) => apiClient.post(`/cert-accounts/${id}/delete`),
 
-  list: (params?: object) => apiClient.get<ApiResponse<Certificate[]>>('/certificates/list', { params }),
+  list: (params?: object) => apiClient.get<ApiResponse<PaginatedResponse<Certificate>>>('/certificates/list', { params }),
   create: (data: object) => apiClient.post('/certificates/create', data),
   detail: (id: number) => apiClient.get(`/certificates/${id}/detail`),
   delete: (id: number) => apiClient.post(`/certificates/${id}/delete`),
@@ -165,7 +165,7 @@ export const monitorApi = {
   overview: () => apiClient.get<ApiResponse<MonitorOverview>>('/monitor/overview'),
   status: () => apiClient.get('/monitor/status'),
   cleanLogs: () => apiClient.post('/monitor/logs/clean'),
-  taskList: (params?: object) => apiClient.get<ApiResponse<MonitorTask[]>>('/monitor/tasks/list', { params }),
+  taskList: (params?: object) => apiClient.get<ApiResponse<PaginatedResponse<MonitorTask>>>('/monitor/tasks/list', { params }),
   taskDetail: (id: number) => apiClient.get(`/monitor/tasks/${id}/detail`),
   taskCreate: (data: object) => apiClient.post('/monitor/tasks/create', data),
   taskUpdate: (id: number, data: object) => apiClient.post(`/monitor/tasks/${id}/update`, data),

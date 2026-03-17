@@ -34,7 +34,7 @@ const batchRemarkText = ref('')
 const toggleAll = (e: Event) => {
   const checked = (e.target as HTMLInputElement).checked
   if (checked) {
-    selectedIds.value = new Set(filtered.value.map(d => d.id))
+    selectedIds.value = new Set(filtered.value.map((d: DomainItem) => d.id))
   } else {
     selectedIds.value.clear()
   }

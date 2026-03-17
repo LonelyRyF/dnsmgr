@@ -30,7 +30,7 @@ const deleteMutation = useMutation({
 
 const { data: domains } = useQuery({
   queryKey: ['domains-list'],
-  queryFn: async () => (await domainsApi.list({ limit: 1000 })).data?.data || []
+  queryFn: async () => (await domainsApi.list({ limit: 1000 })).data.data?.items || []
 })
 
 const showFormSlide = ref(false)

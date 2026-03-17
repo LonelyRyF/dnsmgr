@@ -29,14 +29,14 @@ const { data: monitorOverview } = useQuery({
 const statCards = computed(() => [
   {
     label: '域名总数',
-    value: domains.value?.pagination?.total ?? domains.value?.items?.length ?? 0,
+    value: domains.value?.items?.length ?? 0,
     icon: Globe,
     color: 'accent',
     to: '/domains',
   },
   {
     label: 'SSL 证书',
-    value: certs.value?.pagination?.total ?? certs.value?.items?.length ?? 0,
+    value: certs.value?.items?.length ?? 0,
     icon: ShieldCheck,
     color: 'success',
     to: '/certificates',

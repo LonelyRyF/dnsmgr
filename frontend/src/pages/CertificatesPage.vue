@@ -218,10 +218,10 @@ function certStatusStyle(status: number) {
         </thead>
         <SkeletonRow v-if="isLoading" :cols="5" :rows="6" />
         <tbody v-else>
-          <tr v-if="!data?.data?.length">
+          <tr v-if="!data?.items?.length">
             <td colspan="5" class="py-16 text-center text-text-muted text-sm">暂无证书，点击申请证书开始</td>
           </tr>
-          <tr v-for="cert in data?.data" :key="cert.id" class="group">
+          <tr v-for="cert in data?.items" :key="cert.id" class="group">
             <td class="font-medium font-mono">{{ cert.domain }}</td>
             <td>
               <span :class="['badge', certStatusStyle(cert.status)]">

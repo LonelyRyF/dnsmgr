@@ -51,7 +51,7 @@ const { data: logsData, isLoading: logsLoading } = useQuery({
 
 const { data: domains } = useQuery({
   queryKey: ['domains'],
-  queryFn: async () => (await domainsApi.list({ limit: 1000 })).data?.data || []
+  queryFn: async () => (await domainsApi.list({ limit: 1000 })).data.data?.items || []
 })
 
 const { data: overview, isLoading: overviewLoading } = useQuery({
@@ -62,7 +62,7 @@ const { data: overview, isLoading: overviewLoading } = useQuery({
 
 const { data, isLoading, refetch } = useQuery({
   queryKey: ['monitor-tasks'],
-  queryFn: async () => (await monitorApi.taskList()).data,
+  queryFn: async () => (await monitorApi.taskList()).data.data,
 })
 
 const saveMutation = useMutation({
@@ -128,7 +128,7 @@ async function fetchRecords() {
   isFetchingRecords.value = true
   try {
     const res = await recordsApi.list(Number(formData.value.did), { keyword: formData.value.rr, page_size: 100 })
-    fetchedRecords.value = res.data?.data || []
+    fetchedRecords.value = res.data.data?.items || []
     if (fetchedRecords.value.length === 0) toast.error('未找到匹配的解析记录')
     else toast.success(`获取到 ${fetchedRecords.value.length} 条记录`)
   } catch (err) {
@@ -152,12 +152,12 @@ watch(() => formData.value.recordid, (val) => {
 })
 
 const isAllSelected = computed(() => {
-  return data.value?.data && data.value.data.length > 0 && selectedIds.value.length === data.value.data.length
+  return data.value?.items && data.value.items.length > 0 && selectedIds.value.length === data.value.items.length
 })
 
 function toggleSelectAll() {
   if (isAllSelected.value) selectedIds.value = []
-  else selectedIds.value = data.value?.data?.map((t: MonitorTask) => t.id) || []
+  else selectedIds.value = data.value?.items?.map((t: MonitorTask) => t.id) || []
 }
 </script>
 
@@ -231,10 +231,10 @@ function toggleSelectAll() {
         </thead>
         <SkeletonRow v-if="isLoading" :cols="5" :rows="5" />
         <tbody v-else>
-          <tr v-if="!data?.data?.length">
+          <tr v-if="!data?.items?.length">
             <td colspan="5" class="py-16 text-center text-text-muted text-sm">暂无监控任务</td>
           </tr>
-          <tr v-for="task in data?.data" :key="task.id">
+          <tr v-for="task in data?.items" :key="task.id">
             <td class="text-center"><input type="checkbox" class="checkbox" :value="task.id" v-model="selectedIds" /></td>
             <td>
               <div class="font-medium flex items-center gap-1">
